@@ -49,6 +49,8 @@ val TUNINGS = listOf(
     Tuning("couro", "💺 Bancos de couro", 2500, 0.040, 0.035),
     Tuning("neon", "💡 Neon embaixo", 300, 0.008, 0.005),
     Tuning("turbo", "🚀 Kit turbo", 6000, 0.120, 0.100),
+    Tuning("aerofolio", "🏎️ Aerofólio", 1800, 0.035, 0.030),
+    Tuning("parachoque", "🛡️ Kit para-choque esportivo", 2200, 0.040, 0.035),
 )
 
 class Buyer(

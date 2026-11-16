@@ -1,6 +1,6 @@
 package com.ferrovelho.game
 
-enum class Body { HATCH, SEDAN, SUV, PICKUP, COUPE, CLASSIC }
+enum class Body { HATCH, SEDAN, SUV, PICKUP, COUPE, CLASSIC, VAN, BEETLE, SUPER }
 
 enum class Cat(val label: String) {
     POPULAR("Popular"),
@@ -68,8 +68,8 @@ val CATALOG: List<CarModel> = listOf(
 
     // ---------- Volkswagen ----------
     m("Volkswagen", "Gol", 30000, H, PO, 1980, 2023),
-    m("Volkswagen", "Fusca", 35000, K, CL, 1959, 1996),
-    m("Volkswagen", "Kombi", 60000, H, CL, 1957, 2013),
+    m("Volkswagen", "Fusca", 35000, Body.BEETLE, CL, 1959, 1996),
+    m("Volkswagen", "Kombi", 60000, Body.VAN, CL, 1957, 2013),
     m("Volkswagen", "Brasília", 25000, H, CL, 1973, 1982),
     m("Volkswagen", "Parati", 22000, H, PO, 1982, 2012),
     m("Volkswagen", "Saveiro", 40000, P, PI, 1982, 2023),
@@ -267,6 +267,6 @@ val CATALOG: List<CarModel> = listOf(
     m("Land Rover", "Range Rover Evoque", 250000, U, SU, 2012, 2026),
     m("Volvo", "XC60", 200000, U, SU, 2009, 2026),
     m("Volvo", "XC90", 300000, U, SU, 2003, 2026),
-    m("Ferrari", "488 GTB", 2000000, C, ES, 2015, 2019),
-    m("Lamborghini", "Huracán", 2500000, C, ES, 2014, 2026),
+    m("Ferrari", "488 GTB", 2000000, Body.SUPER, ES, 2015, 2019),
+    m("Lamborghini", "Huracán", 2500000, Body.SUPER, ES, 2014, 2026),
 )
