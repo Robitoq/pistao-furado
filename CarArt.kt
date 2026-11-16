@@ -329,7 +329,7 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
         drawRoundRect(Color(0xFFF5F5F5), Offset(176f, 56.5f), Size(9f, 4.2f), CornerRadius(0.6f))
         drawRect(Color(0xFF1565C0), Offset(176f, 56.5f), Size(9f, 1f))
         drawRoundRect(Color(0xFFF5F5F5), Offset(10f, 57f), Size(8f, 3.8f), CornerRadius(0.6f))
-        for (dx in d.doors.getBounds().let { listOf(it.left + 3f) }) {
+        for (dx in sh.doors.getBounds().let { listOf(it.left + 3f) }) {
             drawRoundRect(dark2, Offset(dx, 46.5f), Size(5.5f, 1.5f), CornerRadius(0.7f))
             drawRoundRect(Color(0x88FFFFFF), Offset(dx, 46.5f), Size(5.5f, 0.5f), CornerRadius(0.3f))
         }
