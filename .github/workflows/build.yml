@@ -10,6 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Aplicar arquivos enviados na raiz
+        run: |
+          G=app/src/main/java/com/ferrovelho/game
+          [ -f Dialog.kt ] && cp Dialog.kt $G/Dialog.kt
+          [ -f CarArt.kt ] && cp CarArt.kt $G/CarArt.kt
+          [ -f app_build.gradle.kts ] && cp app_build.gradle.kts app/build.gradle.kts
+          ls -la ferrovelho.jks
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
