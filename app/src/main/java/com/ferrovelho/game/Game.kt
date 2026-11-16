@@ -178,10 +178,16 @@ class GameState(context: Context) {
     }
 
     fun dateText(): String =
-        SimpleDateFormat("EEE, dd/MM/yyyy", PT_BR).format(cal().time) +
+        (if (minutes < 6 * 60 || minutes >= 19 * 60) "🌙 " else "☀️ ") +
+            SimpleDateFormat("EEE, dd/MM/yyyy", PT_BR).format(cal().time) +
             " • " + String.format(PT_BR, "%02d:%02d", minutes / 60, minutes % 60)
 
     private fun tick(min: Int) { minutes = (minutes + min).coerceAtMost(23 * 60 + 59) }
+
+    fun spendTime(min: Int) = tick(min)
+
+    /** Relógio andando sozinho: chamado a cada segundo pela UI. */
+    fun clockTick() { if (minutes < 23 * 60 + 59) tick(2) }
 
     val event: MarketEvent? get() = EVENTS.getOrNull(eventIdx)
 

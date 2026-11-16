@@ -224,8 +224,31 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
         }
         drawPath(sh.doors, Color(0x88000000), style = Stroke(0.7f))
 
+        // realismo: moldura dos vidros, reflexo, maçanetas e retrovisor
+        sh.glass.forEach { g ->
+            val b = g.getBounds()
+            drawPath(g, Color(0xFF0E1216), style = Stroke(1.4f))
+            if (b.width > 9f) {
+                clipPath(g) {
+                    val q = Path().apply {
+                        moveTo(b.left, b.bottom); lineTo(b.left + b.width * 0.35f, b.top)
+                        lineTo(b.left + b.width * 0.5f, b.top); lineTo(b.left + b.width * 0.15f, b.bottom); close()
+                    }
+                    drawPath(q, Color(0x33FFFFFF))
+                }
+                drawRoundRect(dark2, Offset(b.right - 11f, b.bottom + 3f), Size(5f, 1.6f), CornerRadius(0.8f))
+                drawRoundRect(Color(0x88FFFFFF), Offset(b.right - 11f, b.bottom + 3f), Size(5f, 0.6f), CornerRadius(0.3f))
+            }
+        }
+        sh.glass.lastOrNull()?.getBounds()?.let { b ->
+            drawRoundRect(dark, Offset(b.right - 2f, b.bottom - 3f), Size(5.5f, 3.4f), CornerRadius(1.4f))
+        }
+
         clipPath(sh.body) {
             drawRect(Color(0x22000000), Offset(0f, 59f), Size(200f, 6f))
+            drawRect(Color(0x26FFFFFF), Offset(0f, 44f), Size(200f, 3f))      // reflexo da lateral
+            drawLine(Color(0x44FFFFFF), Offset(10f, 50f), Offset(184f, 50f), 0.6f) // vinco
+            drawLine(Color(0x33000000), Offset(10f, 51f), Offset(184f, 51f), 0.6f)
             if ("adesivo" in tuning) {
                 drawRect(Color(0xCCFFFFFF), Offset(0f, 54f), Size(200f, 2.4f))
                 drawRect(Color(0xCCFFFFFF), Offset(0f, 58f), Size(200f, 1.2f))
@@ -295,6 +318,8 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
             drawCircle(Color(0xFFFFF59D), 3.4f, Offset(hx, d.lampY))
         }
         drawRoundRect(Color(0xFFE53935), Offset(6f, d.lampY - 3f), Size(4f, 5f), CornerRadius(1f))
+        drawRoundRect(Color(0xFF1B1B1B), Offset(184f, d.lampY + 3.5f), Size(9f, 3f), CornerRadius(1f)) // grade
+        drawRoundRect(Color(0xFFFF8A65), Offset(6.5f, d.lampY - 2f), Size(1.5f, 3f), CornerRadius(0.5f)) // brilho lanterna
 
         // entrada de ar do turbo
         if ("turbo" in tuning) {
@@ -342,16 +367,19 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
         val cy = 72f - rr
         drawCircle(Color(0xFF141414), rr, Offset(wx, cy))
         if (worn) drawCircle(Color(0xFF4A4A4A), rr * 0.9f, Offset(wx, cy), style = Stroke(1.1f))
+        drawCircle(Color(0xFF262626), rr * 0.8f, Offset(wx, cy)) // lateral do pneu
         drawCircle(rimC, rr * 0.62f, Offset(wx, cy))
+        drawCircle(Color(0x66FFFFFF), rr * 0.62f, Offset(wx, cy), style = Stroke(0.5f))
         if (gold) {
             for (k in 0 until 5) {
                 val a = k * 2f * PI.toFloat() / 5f
                 drawLine(Color(0xFF8A6A00), Offset(wx, cy), Offset(wx + cos(a) * rr * 0.6f, cy + sin(a) * rr * 0.6f), 1f)
             }
         } else {
-            for (k in 0 until 4) {
-                val a = k * PI.toFloat() / 2f + 0.4f
-                drawCircle(Color(0xFF78909C), 0.8f, Offset(wx + cos(a) * rr * 0.36f, cy + sin(a) * rr * 0.36f))
+            drawCircle(Color(0xFF546E7A), rr * 0.48f, Offset(wx, cy)) // disco de freio
+            for (k in 0 until 5) {
+                val a = k * 2f * PI.toFloat() / 5f + 0.3f
+                drawLine(Color(0xFFECEFF1), Offset(wx, cy), Offset(wx + cos(a) * rr * 0.58f, cy + sin(a) * rr * 0.58f), 1.5f)
             }
         }
         drawCircle(Color(0xFF37474F), rr * 0.18f, Offset(wx, cy))

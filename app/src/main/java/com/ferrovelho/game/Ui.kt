@@ -39,6 +39,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +71,7 @@ fun FerroVelhoApp(g: GameState) {
     var tab by remember { mutableIntStateOf(0) }
     var openCarId by remember { mutableStateOf<Int?>(null) }
     var askReset by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { while (true) { delay(1000); g.clockTick() } }
 
     Scaffold(
         topBar = { TopStatus(g) },
@@ -272,6 +275,7 @@ private fun SectionTitle(text: String) {
 private fun CarScreen(g: GameState, car: OwnedCar, onBack: () -> Unit) {
     val m = CATALOG[car.model]
     val invested = car.paid + car.spent
+    var haggle by remember { mutableStateOf<Haggle?>(null) }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -350,23 +354,16 @@ private fun CarScreen(g: GameState, car: OwnedCar, onBack: () -> Unit) {
             }
         }
 
-        SectionTitle("💰 Vender (as ofertas mudam a cada dia)")
-        g.offers(car).forEach { o ->
-            val profit = o.price - invested
-            Card(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(o.buyer, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text(o.note, fontSize = 11.sp)
-                        Text(
-                            if (profit >= 0) "lucro ${brl(profit)}" else "prejuízo ${brl(-profit)}",
-                            fontSize = 12.sp,
-                            color = if (profit >= 0) GREEN else RED,
-                        )
-                    }
-                    Button(onClick = { g.sell(car.id, o) }) { Text("Vender ${brl(o.price)}", fontSize = 13.sp) }
-                }
-            }
+        SectionTitle("💰 Vender")
+        Button(
+            onClick = {
+                if (g.minutes >= 22 * 60) g.message = "Já é noite, ninguém aparece. Passe pro próximo dia 🌙"
+                else { g.spendTime(30); haggle = newHaggle(g, car) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("👥 Atender um comprador") }
+        haggle?.let { h ->
+            BuyerDialog(h, invested, { p -> g.sell(car.id, Offer(h.type, "", p)); haggle = null }, { haggle = null })
         }
         Spacer(Modifier.height(24.dp))
     }
