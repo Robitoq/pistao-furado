@@ -6,8 +6,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 import kotlin.math.max
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -73,6 +76,22 @@ val BUYERS = listOf(
     Buyer("Fã de esportivos", "paga bem por esportivo tunado", 1.5, 1.08) { it.cat == Cat.ESPORTIVO },
 )
 
+class MarketEvent(val title: String, val text: String, val all: Double, val cats: Map<Cat, Double> = emptyMap())
+
+val EVENTS = listOf(
+    MarketEvent("📉 Crise de crédito", "financiamento travou, ninguém compra", 0.88),
+    MarketEvent("📈 Feirão de carros", "movimento forte nas lojas", 1.08),
+    MarketEvent("⛽ Gasolina nas alturas", "SUV e picape caem, popular sobe", 1.0,
+        mapOf(Cat.SUV to 0.88, Cat.PICAPE to 0.90, Cat.POPULAR to 1.06)),
+    MarketEvent("🌾 Safra recorde", "picape e SUV em alta no campo", 1.0, mapOf(Cat.PICAPE to 1.15, Cat.SUV to 1.06)),
+    MarketEvent("💵 Dólar disparou", "esportivos e importados mais caros", 1.0, mapOf(Cat.ESPORTIVO to 1.15, Cat.SUV to 1.05)),
+    MarketEvent("🚗 Encontro de antigos", "clássicos valorizados", 1.0, mapOf(Cat.CLASSICO to 1.18)),
+    MarketEvent("🧾 Época de IPVA", "muita gente vendendo, preços caem", 0.94),
+)
+
+/** Sazonalidade por mês (jan = IPVA, dez = 13º salário). */
+val SEASON = listOf(0.95, 0.98, 1.0, 1.0, 1.0, 1.0, 1.02, 1.0, 1.0, 1.0, 1.01, 1.04)
+
 val YARD_NAMES = listOf("Ferro Velho do Zé", "Desmanche Central", "Pátio Premium")
 val YARD_DESC = listOf(
     "Carros baratos e batidos (até ~R$ 60 mil de valor)",
@@ -117,7 +136,10 @@ fun baseValue(model: Int, year: Int): Double {
 fun condFactor(cond: List<Int>): Double {
     var w = 0.0
     for (i in cond.indices) w += cond[i] * PART_WEIGHT[i]
-    return 0.30 + 0.70 * (w / 100.0)
+    // curva convexa: carro ruim vale muito pouco; carro inteiro vale o preço cheio
+    var f = 0.10 + 0.90 * (w / 100.0).pow(1.6)
+    if (cond[0] < 20) f *= 0.75 // motor fundido: só comprador de sucata
+    return f
 }
 
 fun tuningPct(ids: List<String>): Double =
@@ -129,6 +151,13 @@ class GameState(context: Context) {
     var money by mutableStateOf(START_MONEY)
     var day by mutableStateOf(1)
     var market by mutableStateOf(1.0)
+    var minutes by mutableStateOf(8 * 60)
+    var startMillis by mutableStateOf(System.currentTimeMillis())
+    var trend by mutableStateOf(0.0)
+    var catMkt by mutableStateOf(mapOf<String, Double>())
+    var eventIdx by mutableStateOf(-1)
+    var eventLeft by mutableStateOf(0)
+    var history by mutableStateOf(listOf(1.0))
     var slots by mutableStateOf(4)
     var garage by mutableStateOf(listOf<OwnedCar>())
     var yards by mutableStateOf(listOf<List<YardCar>>())
@@ -141,12 +170,68 @@ class GameState(context: Context) {
 
     val slotCost: Int get() = 15000 * (slots - 3)
 
+    // ------------------------------------------------------------ data / hora / mercado
+
+    private fun cal(): Calendar = Calendar.getInstance().apply {
+        timeInMillis = startMillis
+        add(Calendar.DAY_OF_YEAR, day - 1)
+    }
+
+    fun dateText(): String =
+        SimpleDateFormat("EEE, dd/MM/yyyy", PT_BR).format(cal().time) +
+            " • " + String.format(PT_BR, "%02d:%02d", minutes / 60, minutes % 60)
+
+    private fun tick(min: Int) { minutes = (minutes + min).coerceAtMost(23 * 60 + 59) }
+
+    val event: MarketEvent? get() = EVENTS.getOrNull(eventIdx)
+
+    fun marketIndex(): Double = market * SEASON[cal().get(Calendar.MONTH)] * (event?.all ?: 1.0)
+
+    fun marketFor(cat: Cat): Double =
+        marketIndex() * (catMkt[cat.name] ?: 1.0) * (event?.cats?.get(cat) ?: 1.0)
+
+    fun trendArrow(): String {
+        val h = history
+        if (h.size < 2) return "▬"
+        val d = h.last() - h[h.size - 2]
+        return if (d > 0.004) "▲" else if (d < -0.004) "▼" else "▬"
+    }
+
+    private fun stepMarket(): String {
+        val r = Random.Default
+        trend = trend * 0.8 + (r.nextDouble() - 0.5) * 0.04
+        market = (market + (1.0 - market) * 0.04 + trend).coerceIn(0.75, 1.30)
+        catMkt = Cat.values().associate { c ->
+            val v = catMkt[c.name] ?: 1.0
+            c.name to (v + (1.0 - v) * 0.08 + (r.nextDouble() - 0.5) * 0.05).coerceIn(0.8, 1.25)
+        }
+        var news = ""
+        if (eventIdx >= 0) {
+            eventLeft -= 1
+            if (eventLeft <= 0) { eventIdx = -1; news = "O mercado se acalmou." }
+        }
+        if (eventIdx < 0 && r.nextDouble() < 0.07) {
+            eventIdx = r.nextInt(EVENTS.size)
+            eventLeft = r.nextInt(4, 10)
+            news = "${EVENTS[eventIdx].title}: ${EVENTS[eventIdx].text}"
+        }
+        history = (history + marketIndex()).takeLast(30)
+        return news
+    }
+
     // ------------------------------------------------------------ novo jogo / dia
 
     fun newGame() {
         money = START_MONEY
         day = 1
         market = 1.0
+        minutes = 8 * 60
+        startMillis = System.currentTimeMillis()
+        trend = 0.0
+        catMkt = emptyMap()
+        eventIdx = -1
+        eventLeft = 0
+        history = listOf(1.0)
         slots = 4
         garage = emptyList()
         sold = 0
@@ -160,9 +245,11 @@ class GameState(context: Context) {
 
     fun nextDay() {
         day += 1
-        market = 0.92 + Random.nextDouble() * 0.16
+        minutes = 8 * 60
+        val news = stepMarket()
         yards = genYards(Random(System.nanoTime()))
         var msg = "Dia $day: chegaram carros novos nos ferros-velhos."
+        if (news.isNotEmpty()) msg += " 📰 $news"
         if (garage.isEmpty() && money < 5000) {
             money = 5000
             msg += " Seu tio emprestou R$ 5.000 pra você recomeçar."
@@ -188,7 +275,7 @@ class GameState(context: Context) {
             val condMin = if (yi == 2) 10 else 5
             val condMax = if (yi == 2) 56 else 51
             val cond = List(5) { rnd.nextInt(condMin, condMax) }
-            val price = roundTo50(baseValue(mi, year) * condFactor(cond) * rnd.nextDouble(0.55, 0.80))
+            val price = roundTo50(baseValue(mi, year) * condFactor(cond) * marketFor(m.cat) * rnd.nextDouble(0.55, 0.80))
             YardCar(nextId++, mi, year, rnd.nextInt(PAINTS.size), cond, price)
         }
     }
@@ -196,12 +283,13 @@ class GameState(context: Context) {
     // ------------------------------------------------------------ compra
 
     fun yardValue(y: YardCar): Int =
-        (baseValue(y.model, y.year) * condFactor(y.cond) * market).toInt()
+        (baseValue(y.model, y.year) * condFactor(y.cond) * marketFor(CATALOG[y.model].cat)).toInt()
 
     fun buy(yardIdx: Int, y: YardCar) {
         if (garage.size >= slots) { message = "Garagem cheia! Venda um carro ou compre mais uma vaga."; return }
         if (y.price > money) { message = "Dinheiro insuficiente."; return }
         money -= y.price
+        tick(30)
         garage = garage + OwnedCar(y.id, y.model, y.year, y.color, y.cond, emptyList(), y.price)
         yards = yards.mapIndexed { i, l -> if (i == yardIdx) l.filter { it.id != y.id } else l }
         message = "Comprou ${CATALOG[y.model].fullName} ${y.year} por ${brl(y.price)}. Bora arrumar!"
@@ -235,6 +323,7 @@ class GameState(context: Context) {
         val cost = repairCost(car, part, target)
         if (cost > money) { message = "Dinheiro insuficiente."; return }
         money -= cost
+        tick(30)
         update(carId) {
             val l = it.cond.toMutableList()
             l[part] = target
@@ -251,6 +340,7 @@ class GameState(context: Context) {
         if (cost == 0) return
         if (cost > money) { message = "Dinheiro insuficiente pra reparar tudo (${brl(cost)})."; return }
         money -= cost
+        tick(120)
         update(carId) { it.copy(cond = List(5) { MAX_COND }, spent = it.spent + cost) }
         message = "Carro 100% revisado por ${brl(cost)}."
         save()
@@ -265,6 +355,7 @@ class GameState(context: Context) {
         val price = tuningPrice(car, t)
         if (price > money) { message = "Dinheiro insuficiente."; return }
         money -= price
+        tick(90)
         update(carId) { it.copy(tuning = it.tuning + t.id, spent = it.spent + price) }
         message = "Instalou ${t.name} por ${brl(price)}."
         save()
@@ -278,6 +369,7 @@ class GameState(context: Context) {
         val cost = paintCost(car)
         if (cost > money) { message = "Pintura custa ${brl(cost)}."; return }
         money -= cost
+        tick(120)
         update(carId) { it.copy(color = colorIdx, spent = it.spent + cost) }
         message = "Pintou de ${PAINTS[colorIdx].first} por ${brl(cost)}."
         save()
@@ -286,7 +378,7 @@ class GameState(context: Context) {
     // ------------------------------------------------------------ venda
 
     fun marketValue(car: OwnedCar): Int =
-        (baseValue(car.model, car.year) * condFactor(car.cond) * (1.0 + tuningPct(car.tuning) * 0.8) * market).toInt()
+        (baseValue(car.model, car.year) * condFactor(car.cond) * (1.0 + tuningPct(car.tuning) * 0.8) * marketFor(CATALOG[car.model].cat)).toInt()
 
     fun offers(car: OwnedCar): List<Offer> {
         val m = CATALOG[car.model]
@@ -294,9 +386,10 @@ class GameState(context: Context) {
         val bv = baseValue(car.model, car.year)
         val cf = condFactor(car.cond)
         val tp = tuningPct(car.tuning)
-        val buyers = BUYERS.filter { it.ok(m) }.shuffled(rnd).take(3)
+        val mk = marketFor(m.cat)
+        val buyers = BUYERS.filter { it.ok(m) && !(cf < 0.45 && it.name == "Pai de família") }.shuffled(rnd).take(3)
         return buyers.map { b ->
-            val v = bv * cf * (1.0 + tp * b.tuneMult) * b.mult * market * (0.96 + rnd.nextDouble() * 0.08)
+            val v = bv * cf * (1.0 + tp * b.tuneMult) * b.mult * mk * (0.96 + rnd.nextDouble() * 0.08)
             Offer(b.name, b.note, roundTo50(v))
         }.sortedByDescending { it.price }
     }
@@ -305,6 +398,7 @@ class GameState(context: Context) {
         val car = garage.firstOrNull { it.id == carId } ?: return
         val profit = o.price - car.paid - car.spent
         money += o.price
+        tick(30)
         sold += 1
         totalProfit += profit
         garage = garage.filter { it.id != carId }
@@ -329,6 +423,13 @@ class GameState(context: Context) {
         o.put("profit", totalProfit)
         o.put("nextId", nextId)
         o.put("seed", seed)
+        o.put("minutes", minutes)
+        o.put("start", startMillis)
+        o.put("trend", trend)
+        o.put("eventIdx", eventIdx)
+        o.put("eventLeft", eventLeft)
+        o.put("history", JSONArray().also { a -> history.forEach { a.put(it) } })
+        o.put("cat", JSONObject().also { j -> catMkt.forEach { (k, v) -> j.put(k, v) } })
         val g = JSONArray()
         garage.forEach { g.put(it.toJson()) }
         o.put("garage", g)
@@ -358,6 +459,13 @@ class GameState(context: Context) {
             totalProfit = o.getInt("profit")
             nextId = o.getInt("nextId")
             seed = o.getInt("seed")
+            minutes = o.optInt("minutes", 8 * 60)
+            startMillis = o.optLong("start", System.currentTimeMillis())
+            trend = o.optDouble("trend", 0.0)
+            eventIdx = o.optInt("eventIdx", -1)
+            eventLeft = o.optInt("eventLeft", 0)
+            history = o.optJSONArray("history")?.let { a -> List(a.length()) { a.getDouble(it) } } ?: listOf(market)
+            catMkt = o.optJSONObject("cat")?.let { j -> j.keys().asSequence().associateWith { j.getDouble(it) } } ?: emptyMap()
             val g = o.getJSONArray("garage")
             garage = List(g.length()) { g.getJSONObject(it).toOwned() }
             val ys = o.getJSONArray("yards")

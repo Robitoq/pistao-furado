@@ -1,6 +1,6 @@
 package com.ferrovelho.game
 
-enum class Body { HATCH, SEDAN, SUV, PICKUP, COUPE, CLASSIC, VAN, BEETLE, SUPER }
+enum class Body { BOXY, COMPACT, WAGON, MPV, HATCH, SEDAN, SUV, PICKUP, COUPE, CLASSIC, VAN, BEETLE, SUPER }
 
 enum class Cat(val label: String) {
     POPULAR("Popular"),
@@ -38,8 +38,19 @@ private val PI = Cat.PICAPE
 private val ES = Cat.ESPORTIVO
 private val CL = Cat.CLASSICO
 
+/** Silhueta própria por modelo (o que não estiver aqui usa a carroceria genérica da linha). */
+private val SHAPE: Map<String, Body> = buildMap {
+    listOf("Uno", "147", "Gol", "Brasília", "Kadett GSi", "Escort XR3", "Soul", "Kwid", "BR-800", "Fiorino")
+        .forEach { put(it, Body.BOXY) }
+    listOf("Palio", "Mobi", "Argo", "Punto", "Celta", "Corsa", "Onix", "Agile", "Ka", "Fiesta", "Up!", "Fox",
+        "Polo", "HB20", "March", "206", "207", "208", "Etios", "Sandero", "Yaris", "Twingo", "Clio", "Dolphin")
+        .forEach { put(it, Body.COMPACT) }
+    listOf("Parati", "Belina").forEach { put(it, Body.WAGON) }
+    listOf("Idea", "Doblò", "Meriva", "Spin", "Fit").forEach { put(it, Body.MPV) }
+}
+
 private fun m(brand: String, name: String, base: Int, body: Body, cat: Cat, from: Int, to: Int) =
-    CarModel(brand, name, base, body, cat, from, to)
+    CarModel(brand, name, base, SHAPE[name] ?: body, cat, from, to)
 
 // Valores e anos aproximados, só pra jogabilidade. Pra adicionar um carro, é só incluir uma linha aqui.
 val CATALOG: List<CarModel> = listOf(

@@ -1,5 +1,9 @@
 package com.ferrovelho.game
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -121,7 +125,9 @@ private fun TopStatus(g: GameState) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(brl(g.money), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = GREEN)
-                Text("Dia ${g.day} • mercado ${(g.market * 100).roundToInt()}%", fontSize = 12.sp)
+                Text(g.dateText(), fontSize = 12.sp)
+                Text("Dia ${g.day} • mercado ${(g.marketIndex() * 100).roundToInt()}% ${g.trendArrow()}", fontSize = 12.sp)
+                g.event?.let { Text("${it.title} — ${it.text}", fontSize = 11.sp) }
             }
             Button(onClick = { g.nextDay() }) { Text("Próximo dia ▶") }
         }
@@ -375,7 +381,13 @@ private fun SummaryScreen(g: GameState, onReset: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text("Resumo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(g.dateText())
         Text("Dia: ${g.day}")
+        SectionTitle("Mercado (últimos 30 dias)")
+        MarketChart(g.history)
+        Cat.values().forEach { c ->
+            Text("${c.label}: ${(g.marketFor(c) * 100).roundToInt()}%", fontSize = 13.sp)
+        }
         Text("Dinheiro: ${brl(g.money)}")
         Text("Carros vendidos: ${g.sold}")
         Text("Lucro total: ${brl(g.totalProfit)}", color = if (g.totalProfit >= 0) GREEN else RED)
@@ -394,5 +406,23 @@ private fun SummaryScreen(g: GameState, onReset: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
         OutlinedButton(onClick = onReset) { Text("Reiniciar jogo") }
+    }
+}
+
+@Composable
+private fun MarketChart(h: List<Double>) {
+    val line = MaterialTheme.colorScheme.primary
+    Canvas(Modifier.fillMaxWidth().height(90.dp)) {
+        if (h.size >= 2) {
+            val lo = minOf(h.minOrNull() ?: 1.0, 0.9)
+            val hi = maxOf(h.maxOrNull() ?: 1.0, 1.1)
+            val path = Path()
+            h.forEachIndexed { i, v ->
+                val x = size.width * i / (h.size - 1)
+                val y = size.height * (1f - ((v - lo) / (hi - lo)).toFloat())
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(path, line, style = Stroke(4f))
+        }
     }
 }
