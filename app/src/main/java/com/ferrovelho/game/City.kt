@@ -185,13 +185,31 @@ fun DrawScope.drawWheels(ci: Int, left: Float, top: Float, u: Float, h: Float, r
     }
 }
 
-fun DrawScope.drawDriver(l: Look, left: Float, top: Float, u: Float, w: Float) {
-    val x = left + w * 0.55f * u
-    val y = top + 3.4f * u
-    drawRect(CTOP[l.top], Offset(x - 0.3f * u, y + 3.2f * u), Size(4f * u, 1.6f * u))
-    drawRect(CSKIN[l.skin], Offset(x, y), Size(3.4f * u, 3.2f * u))
-    if (l.hairStyle != 3) drawRect(CHAIR[l.hair], Offset(x, y - 0.3f * u), Size(3.4f * u, 1.3f * u))
-    drawRect(Color(0xFF212121), Offset(x + 2.3f * u, y + 1.5f * u), Size(0.7f * u, 0.8f * u))
+// posição da cabeça do motorista em cada sprite (x do centro, y do topo), na janela
+val DRIVER_POS_PUBLIC get() = DRIVER_POS
+private val DRIVER_POS = listOf(
+    33f to 2.8f, 27f to 3f, 34f to 3.2f, 33f to 3.6f, 30f to 3f, 33f to 4f, 30f to 7.5f, 32f to 4f, 25f to 3.2f,
+)
+
+fun DrawScope.drawDriver(l: Look, ci: Int, left: Float, top: Float, u: Float) {
+    val p = DRIVER_POS[ci.coerceIn(0, DRIVER_POS.lastIndex)]
+    val x = left + (p.first - 2f) * u
+    val y = top + p.second * u
+    val dark = Color(0xFF212121)
+    drawRect(CTOP[l.top], Offset(x - 0.8f * u, y + 4f * u), Size(5.6f * u, 2f * u))
+    drawRect(CSKIN[l.skin], Offset(x + 1.2f * u, y + 3.6f * u), Size(1.6f * u, 0.6f * u))
+    drawRect(CSKIN[l.skin], Offset(x, y), Size(4f * u, 4f * u))
+    when (l.hairStyle) {
+        3 -> {}
+        5 -> {
+            drawRect(CTOP[l.top], Offset(x - 0.2f * u, y - 0.8f * u), Size(4.4f * u, 1.6f * u))
+            drawRect(dark, Offset(x + 3.4f * u, y + 0.2f * u), Size(1.8f * u, 0.6f * u))
+        }
+        else -> drawRect(CHAIR[l.hair], Offset(x - 0.2f * u, y - 0.8f * u), Size(4.4f * u, 1.8f * u))
+    }
+    if (l.hairStyle == 1) drawRect(CHAIR[l.hair], Offset(x - 0.6f * u, y), Size(1f * u, 4.6f * u))
+    drawRect(dark, Offset(x + 2.6f * u, y + 1.7f * u), Size(0.8f * u, 1f * u))
+    if (l.glasses) drawRect(dark, Offset(x + 2f * u, y + 1.4f * u), Size(2.2f * u, 0.4f * u))
 }
 
 private fun DrawScope.sp(
@@ -210,7 +228,7 @@ private fun DrawScope.sp(
             IntSize(w.toInt().coerceAtLeast(1), h.toInt().coerceAtLeast(1)), alpha,
             androidx.compose.ui.graphics.drawscope.Fill, filter, BlendMode.SrcOver, FilterQuality.None)
         if (carIdx >= 0) drawWheels(carIdx, dx, dy, k * s, img.height.toFloat(), rot)
-        if (driver != null) drawDriver(driver, dx, dy, k * s, img.width.toFloat())
+        if (driver != null && carIdx >= 0) drawDriver(driver, carIdx, dx, dy, k * s)
     }
     if (flip) withTransform({ scale(-1f, 1f, Offset(dx + w / 2f, dy)) }) { body() } else body()
 }
@@ -359,7 +377,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var sayUntil by remember { mutableFloatStateOf(4f) }
     val near by remember { derivedStateOf { YARD_X.indexOfFirst { abs(px - it) < 30f } } }
 
-    DisposableEffect(Unit) { onDispose { prefs.edit().putFloat("x", px).apply() } }
+    LaunchedEffect(say) { say?.let { Voice.speak(it, if (look.female) 1.3f else 0.95f) } }
+    DisposableEffect(Unit) { onDispose { prefs.edit().putFloat("x", px).apply(); Voice.stop() } }
     LaunchedEffect(Unit) {
         var last = 0L
         var idle = 0f
@@ -523,41 +542,77 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 }
             }
 
-            // ---- noite
+            // ---- ambiente: pôr do sol e noite
+            val tw = 4f * night * (1f - night)
+            if (tw > 0.02f) {
+                drawRect(
+                    Brush.verticalGradient(listOf(Color.Transparent, Color(0xFFFF8F3D).copy(alpha = 0.5f * tw)), oy * 0.2f, oy + 104f * s),
+                    size = Size(size.width, oy + 104f * s), blendMode = BlendMode.Plus,
+                )
+            }
             if (night > 0f) {
-                drawRect(Color(0xFF070B2A).copy(alpha = 0.62f * night), size = size)
+                drawRect(
+                    Brush.verticalGradient(listOf(Color(0xFF050924).copy(alpha = 0.72f * night), Color(0xFF141B4A).copy(alpha = 0.55f * night)), 0f, size.height),
+                    size = size,
+                )
                 for (i in stars.indices) {
-                    val tw = 0.5f + 0.5f * sin(t * 2f + i)
-                    drawRect(Color.White.copy(alpha = night * tw), Offset(stars[i].x * size.width, stars[i].y * (oy + 60f * s)), Size(1.3f * s, 1.3f * s))
+                    val tw2 = 0.5f + 0.5f * sin(t * 2f + i)
+                    drawRect(Color.White.copy(alpha = night * tw2), Offset(stars[i].x * size.width, stars[i].y * (oy + 60f * s)), Size(1.3f * s, 1.3f * s))
                 }
                 drawCircle(Color(0xFFF5F5DC).copy(alpha = night), 7f * s, Offset(size.width * 0.25f, oy * 0.4f))
+                glow(Offset(size.width * 0.25f, oy * 0.4f), 26f * s, Color(0xFFCFD8FF).copy(alpha = 0.25f * night))
                 withTransform({ translate(0f, oy) }) {
                     for (it in city) {
                         if (it.x > cam + VIEW_W + 20f || it.x < cam - 110f) continue
-                        if (it.kind == 0) sp(spr.win[it.idx], it.x, 104f, cam, s, 1f, false, null, night)
+                        if (it.kind == 0) {
+                            sp(spr.win[it.idx], it.x, 104f, cam, s, 1f, false, null, night)
+                            val bw = spr.bld[it.idx].width.toFloat()
+                            val bh = spr.bld[it.idx].height.toFloat()
+                            glow(Offset((it.x + bw / 2f - cam) * s, (104f - bh * 0.5f) * s), max(bw, bh) * 0.55f * s, Color(0xFFFFD27A).copy(alpha = 0.16f * night))
+                        }
                         if (it.kind == 2) {
-                            val c = Offset((it.x + 4.5f - cam) * s, 86f * s)
-                            glow(c, 30f * s, Color(0x88FFD27A).copy(alpha = 0.55f * night))
-                            glow(Offset(c.x, 114f * s), 22f * s, Color(0x55FFD27A).copy(alpha = 0.4f * night))
+                            val lc = Offset((it.x + 4.5f - cam) * s, 86f * s)
+                            val cone = Path().apply {
+                                moveTo(lc.x - 2f * s, lc.y); lineTo(lc.x + 2f * s, lc.y)
+                                lineTo(lc.x + 27f * s, 117f * s); lineTo(lc.x - 27f * s, 117f * s); close()
+                            }
+                            drawPath(
+                                cone,
+                                Brush.verticalGradient(listOf(Color(0xFFFFD27A).copy(alpha = 0.42f * night), Color(0xFFFFD27A).copy(alpha = 0.06f * night)), lc.y, 117f * s),
+                                blendMode = BlendMode.Plus,
+                            )
+                            glow(Offset(lc.x, 114f * s), 26f * s, Color(0xFFFFC66E).copy(alpha = 0.35f * night))
+                            glow(lc, 7f * s, Color(0xFFFFF1C2).copy(alpha = 0.95f * night))
                         }
                     }
                     YARD_X.forEachIndexed { i, yx ->
                         if (yx + 100f < cam || yx - 100f > cam + VIEW_W) return@forEachIndexed
                         wr(Color(0xFFFFEB3B).copy(alpha = night), yx - 48f, 44f, 96f, 16f, cam, s)
                         label(paint, YARD_NAMES[i], yx, 56f, cam, s, 8f, 0xFF212121.toInt())
-                        glow(Offset((yx - cam) * s, 52f * s), 60f * s, Color(0x66FFEB3B).copy(alpha = 0.5f * night))
+                        glow(Offset((yx - cam) * s, 52f * s), 60f * s, Color(0xFFFFEB3B).copy(alpha = 0.3f * night))
+                        glow(Offset((yx - cam) * s, 100f * s), 34f * s, Color(0xFFFFB74D).copy(alpha = 0.3f * night))
                     }
                     for (c in traffic) {
                         val x = (((c.x0 + t * c.speed) % WORLD) + WORLD) % WORLD
-                        if (x < cam - 90f || x > cam + VIEW_W + 10f) continue
+                        if (x < cam - 90f || x > cam + VIEW_W + 60f) continue
                         val wcar = spr.cars[c.spr].width * 1.1f
                         val by = if (c.lane == 0) 133f else 148f
-                        val fx = if (c.lane == 0) x + wcar - 2f else x + 2f
                         val sgn = if (c.lane == 0) 1f else -1f
-                        glow(Offset((fx + sgn * 16f - cam) * s, (by - 6f) * s), 26f * s, Color(0xAAFFF3B0).copy(alpha = 0.8f * night))
-                        glow(Offset((fx + sgn * 5f - cam) * s, (by - 6f) * s), 9f * s, Color(0xFFFFFFFF).copy(alpha = night))
+                        val fx = if (c.lane == 0) x + wcar - 1f else x + 1f
+                        val fp = Offset((fx - cam) * s, (by - 6.5f) * s)
+                        val beam = Path().apply {
+                            moveTo(fp.x, fp.y - 1.2f * s); lineTo(fp.x + sgn * 48f * s, fp.y - 8f * s)
+                            lineTo(fp.x + sgn * 48f * s, fp.y + 6f * s); lineTo(fp.x, fp.y + 1.2f * s); close()
+                        }
+                        drawPath(
+                            beam,
+                            Brush.horizontalGradient(listOf(Color(0xFFFFF3B0).copy(alpha = 0.55f * night), Color(0xFFFFF3B0).copy(alpha = 0f)), fp.x, fp.x + sgn * 48f * s),
+                            blendMode = BlendMode.Plus,
+                        )
+                        glow(fp, 5f * s, Color(0xFFFFFFFF).copy(alpha = 0.95f * night))
                         val rx = if (c.lane == 0) x + 1f else x + wcar - 3f
                         wr(Color(0xFFFF1744).copy(alpha = night), rx, by - 9f, 2f, 2f, cam, s)
+                        glow(Offset((rx + 1f - cam) * s, (by - 8f) * s), 5f * s, Color(0xFFFF1744).copy(alpha = 0.4f * night))
                     }
                 }
             }
@@ -586,7 +641,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
 
     talk?.let { (yi, first) ->
-        YardTalk(g, yi, me.name, first, mask == 31, spr) { talk = null }
+        YardTalk(g, yi, me.name, me.look.female, first, mask == 31, spr) { talk = null }
     }
     if (taxi) {
         Dialog(onDismissRequest = { taxi = false }) {
@@ -752,6 +807,9 @@ private val OWNERS = listOf(
         "Continua explorando, {n}. A chave tá guardada."),
 )
 
+private val OWNER_PITCH = listOf(0.7f, 1.15f, 0.85f, 1.5f, 0.8f)
+private val OWNER_RATE = listOf(0.85f, 1.0f, 0.9f, 1.25f, 0.85f)
+
 private val ENDING = listOf(
     "Você conheceu todos os pátios da cidade, {n}. O Chico tinha razão sobre você.",
     "Toma a chave. É da oficina dele no centro. Agora ela é sua.",
@@ -759,7 +817,7 @@ private val ENDING = listOf(
 )
 
 @Composable
-private fun YardTalk(g: GameState, yi: Int, pname: String, first: Boolean, allDone: Boolean, spr: CitySprites, onClose: () -> Unit) {
+private fun YardTalk(g: GameState, yi: Int, pname: String, female: Boolean, first: Boolean, allDone: Boolean, spr: CitySprites, onClose: () -> Unit) {
     val o = OWNERS[yi]
     // humor do dono muda a cada dia: 0 = fechado pra negociar, 1 = normal, 2 = de bom humor
     val mood = remember { Random(g.day * 131 + yi * 17).nextInt(100).let { if (it < 25) 0 else if (it < 75) 1 else 2 } }
@@ -780,6 +838,18 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, first: Boolean, allDo
     var cur by remember(y?.id) { mutableIntStateOf(y?.price ?: 0) }
     var patience by remember(y?.id) { mutableIntStateOf(if (mood == 2) 3 else 2) }
     val chance = (o.easy * 0.7 + (if (mood == 2) 0.25 else 0.0) + 0.1).coerceIn(0.05, 0.95)
+
+    var lastYou by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(speech, you) {
+        val yy = you
+        val pi = OWNER_PITCH[yi.coerceIn(0, 4)]; val ra = OWNER_RATE[yi.coerceIn(0, 4)]
+        if (yy != null && yy != lastYou) {
+            lastYou = yy
+            Voice.speak(yy, if (female) 1.3f else 0.95f)
+            Voice.speak(speech, pi, ra, add = true)
+        } else Voice.speak(speech, pi, ra)
+    }
+    DisposableEffect(Unit) { onDispose { Voice.stop() } }
 
     fun offer(pct: Int) {
         val c = picked ?: return

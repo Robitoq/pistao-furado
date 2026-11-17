@@ -71,6 +71,7 @@ fun CarArt(
         paint.blue * k * 0.299f, paint.blue * k * 0.587f, paint.blue * k * 0.114f, 0f, 0f,
         0f, 0f, 0f, 1f, 0f,
     ))
+    val driver = remember { loadProfile(ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE))?.look }
     fun part(i: Int) = cond.getOrElse(i) { 100 }
     Canvas(modifier) {
         try {
@@ -135,16 +136,19 @@ fun CarArt(
                     }
                 }
 
-                // ---- interior (banco aparece pela janela)
-                val seatX = w * 0.46f
+                // ---- interior (banco atrás do motorista, aparece pela janela)
+                val dp = DRIVER_POS_PUBLIC[ci.coerceIn(0, DRIVER_POS_PUBLIC.lastIndex)]
+                val seatX = dp.first - 5.6f
+                val seatY = dp.second + 1.2f
                 if ("couro" in tuning) {
-                    r(Color(0xFF6D4C41), seatX, top + 2.4f, 3.4f, 4.2f)
-                    r(Color(0xFF8D6E63), seatX, top + 2.4f, 3.4f, 0.8f)
+                    r(Color(0xFF6D4C41), seatX, seatY, 2.4f, 5f)
+                    r(Color(0xFF8D6E63), seatX, seatY, 2.4f, 0.8f)
                 } else if (inter < 45) {
-                    r(Color(0xFF7A7A7A), seatX, top + 2.4f, 3.4f, 4.2f)
-                    r(Color(0xFFF2E6C9), seatX + 0.6f, top + 3.2f, 1.6f, 1.4f)   // espuma saindo
-                    r(Color(0xFF2B2B2B), seatX + 2.0f, top + 4.4f, 1.0f, 1.2f)   // rasgo
+                    r(Color(0xFF7A7A7A), seatX, seatY, 2.4f, 5f)
+                    r(Color(0xFFF2E6C9), seatX + 0.5f, seatY + 0.8f, 1.4f, 1.3f)
+                    r(Color(0xFF2B2B2B), seatX + 1.3f, seatY + 2.6f, 0.9f, 1.1f)
                 }
+                if (driver != null) drawDriver(driver, ci, ox, oy, s)
 
                 // ---- tuning no corpo
                 if ("pelicula" in tuning) band(w * 0.18f, top + 1f, w * 0.80f, top + h * 0.32f, Color(0xB005080F))

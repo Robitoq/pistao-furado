@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Music.init(applicationContext)
+        Voice.init(applicationContext)
         val crashPrefs = getSharedPreferences("crash", Context.MODE_PRIVATE)
         val prev = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
@@ -82,11 +83,12 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         Music.pause()
+        Voice.stop()
         game?.save()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (isFinishing) Music.release()
+        if (isFinishing) { Music.release(); Voice.shutdown() }
     }
 }

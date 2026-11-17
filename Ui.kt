@@ -162,6 +162,11 @@ private fun TopStatus(g: GameState, onNext: () -> Unit) {
                 if (snd) "🔊" else "🔇", fontSize = 22.sp,
                 modifier = Modifier.clickable { snd = Music.toggle(sctx.applicationContext) }.padding(end = 10.dp),
             )
+            var vz by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Voice.enabled) }
+            Text(
+                if (vz) "🗣️" else "🤐", fontSize = 22.sp,
+                modifier = Modifier.clickable { vz = Voice.toggle(sctx.applicationContext) }.padding(end = 10.dp),
+            )
             Button(onClick = onNext) { Text("Próximo dia ▶") }
         }
     }
