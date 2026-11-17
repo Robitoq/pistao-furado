@@ -106,6 +106,21 @@ private fun defOf(b: Body): Def = when (b) {
         listOf("M40,42 C48,31 58,27 72,27 L74,27 L74,42 Z", "M78,27 C94,27 106,32 116,42 L78,42 Z"),
         "M76,42 L76,63", 42f, 150f, 11f, 54f, 150f, 45f, 18f, 44f, chrome = true,
     )
+    Body.RETRO, Body.BOXSEDAN -> Def(
+        "M6,62 L6,46 Q6,43 11,43 L50,42 L64,28 Q66,26 70,26 L114,26 Q118,26 120,28 L142,43 L180,47 Q195,49 196,56 L196,62 Q196,64 192,64 L10,64 Q6,64 6,62 Z",
+        listOf("M54,41 L66,29 L78,29 L78,41 Z", "M83,29 L114,29 L118,29.5 L135,41 L83,41 Z"),
+        "M80,41 L79,63 M120,41 L122,63", 44f, 150f, 11f, 54f, 166f, 48f, 14f, 43f, chrome = b == Body.RETRO,
+    )
+    Body.CREW -> Def(
+        "M6,62 L6,40 L70,40 L70,34 L76,34 L80,26 L136,26 C146,26 152,32 158,40 L182,44 Q195,46 196,56 L196,62 Q196,64 192,64 L10,64 Q6,64 6,62 Z",
+        listOf("M83,29 L104,29 L104,38.5 L83,38.5 Z", "M108,29 L134,29 C142,29 147,33 152,38.5 L108,38.5 Z"),
+        "M106,39 L105,63 M81,39 L80,63", 38f, 150f, 13f, 52f, 170f, 44f, 10f, 40f, "M8,40 L68,40 L68,43.5 L8,43.5 Z",
+    )
+    Body.JEEP -> Def(
+        "M6,62 L6,34 Q6,30 12,30 L40,30 L42,26 L124,26 L130,38 L134,40 L184,40 Q196,42 196,54 L196,62 Q196,64 192,64 L10,64 Q6,64 6,62 Z",
+        listOf("M46,29 L76,29 L76,39 L46,39 Z", "M80,29 L116,29 L122,39 L80,39 Z"),
+        "M78,39 L78,63", 44f, 150f, 13f, 50f, 172f, 44f, 10f, 30f,
+    )
     Body.SUPER -> Def(
         "M6,62 L6,54 Q6,50 14,49 L56,47 C72,36 90,32 110,32 C126,32 136,40 146,46 L186,52 Q196,54 196,60 L196,62 Q196,64 192,64 L10,64 Q6,64 6,62 Z",
         listOf("M70,46 C82,37 94,34 108,34 C120,34 128,39 138,46 Z"),
@@ -172,13 +187,26 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
     // sombra e neon
     drawOval(Color(0x55000000), Offset(12f, 69f), Size(184f, 6f))
     if ("neon" in tuning) {
-        for (i in 0..5) drawRect(Color(0xFF00E5FF).copy(alpha = 0.10f + 0.05f * i), Offset(18f, 68f + i * 0.9f), Size(164f, 1.4f))
+        val neon = Color(0xFF18E8FF)
+        for (i in 0..5) drawOval(neon.copy(alpha = 0.06f + i * 0.04f), Offset(12f + i * 5f, 66.5f + i * 0.4f), Size(176f - i * 10f, 9f - i * 1.2f))
+        drawRoundRect(neon.copy(alpha = 0.55f), Offset(30f, 63.1f), Size(140f, 2f), CornerRadius(1f))
+        drawRoundRect(Color(0xFFE6FDFF), Offset(34f, 63.6f), Size(132f, 0.8f), CornerRadius(0.4f))
     }
 
     withTransform({ translate(0f, dy); rotate(sag * 2f, Offset(100f, 62f)) }) {
         // escapamento
         val esc = "escape" in tuning
-        drawRect(if (esc) Color(0xFFCFD8DC) else Color(0xFF546E7A), Offset(0f, 60f), Size(if (esc) 9f else 5f, if (esc) 3.4f else 2f))
+        if (esc) {
+            val inox = Brush.verticalGradient(listOf(Color(0xFFF1F4F5), Color(0xFF8A9BA3), Color(0xFF36454C)), 63.5f, 68f)
+            drawRoundRect(Color(0xFF55646B), Offset(38f, 64f), Size(22f, 2f), CornerRadius(1f))          // tubo
+            drawRoundRect(inox, Offset(10f, 63.5f), Size(30f, 4.6f), CornerRadius(2.3f))                 // abafador
+            drawLine(Color(0x55000000), Offset(18f, 63.8f), Offset(18f, 67.8f), 0.5f)
+            drawLine(Color(0x55000000), Offset(32f, 63.8f), Offset(32f, 67.8f), 0.5f)
+            drawRoundRect(Color(0xFF6D7C83), Offset(3f, 64.6f), Size(8f, 2f), CornerRadius(1f))
+            drawOval(Color(0xFFDDE3E6), Offset(0.6f, 62.6f), Size(6.2f, 5.6f))                           // ponteira
+            drawOval(Color(0xFF3F5FA8), Offset(0.6f, 62.6f), Size(6.2f, 5.6f), style = Stroke(0.7f))     // titânio azulado
+            drawOval(Color(0xFF0B0D0E), Offset(1.9f, 63.8f), Size(3.4f, 3.2f))
+        } else drawRect(Color(0xFF546E7A), Offset(0f, 60f), Size(5f, 2f))
 
         // carroceria
         drawPath(sh.body, Brush.verticalGradient(listOf(light, paintC, dark), 22f, 64f))
@@ -206,7 +234,10 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
                     drawCircle(Color(0xFFB0BEC5), 2f, Offset(b.left + 5f, b.bottom - 3f), style = Stroke(0.7f))
                 }
             }
-            if ("pelicula" in tuning) drawPath(g, Color(0xE60E1A22))
+            if ("pelicula" in tuning) {
+                drawPath(g, Color(0xE60E1A22))
+                clipPath(g) { val gb = g.getBounds(); drawLine(Color(0x22FFFFFF), Offset(gb.left + 6f, gb.bottom), Offset(gb.left + 16f, gb.top), 3f) }
+            }
             else drawPath(g, Brush.verticalGradient(listOf(Color(0xB0CBE9F8), Color(0xB07FB2D6)), b.top, b.bottom))
         }
         // vidro trincado
@@ -251,8 +282,9 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
             drawLine(Color(0x44FFFFFF), Offset(10f, 50f), Offset(184f, 50f), 0.6f) // vinco
             drawLine(Color(0x33000000), Offset(10f, 51f), Offset(184f, 51f), 0.6f)
             if ("adesivo" in tuning) {
-                drawRect(Color(0xCCFFFFFF), Offset(0f, 54f), Size(200f, 2.4f))
-                drawRect(Color(0xCCFFFFFF), Offset(0f, 58f), Size(200f, 1.2f))
+                drawPath(Path().apply { moveTo(0f, 53.4f); lineTo(178f, 53.4f); lineTo(169f, 57.6f); lineTo(0f, 57.6f); close() }, Color(0xE8F5F5F5))
+                drawPath(Path().apply { moveTo(0f, 58.6f); lineTo(165f, 58.6f); lineTo(162f, 59.9f); lineTo(0f, 59.9f); close() }, Color(0xFFE53935))
+                drawRect(Color(0x30000000), Offset(0f, 57.1f), Size(170f, 0.5f))
             }
             // amassados
             if (lat < 70) {
@@ -300,13 +332,18 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
             drawRoundRect(bump, Offset(186f, 56f), Size(11f, 7f), CornerRadius(2f))
         }
         if ("parachoque" in tuning) {
-            val kit = Color(0xFF111111)
+            val kit = Color(0xFF15181B)
+            val acc = Color(0xFFE53935)
             if (lat >= 20) {
-                drawRoundRect(kit, Offset(187f, 58f), Size(9f, 4.5f), CornerRadius(1f))
-                drawPath(p("M184,64 L198,64 L198,61 Q191,60 184,62 Z"), dark2)
+                drawPath(p("M183,64.6 L198,64.6 L198,58 Q192,57 186,59.5 Z"), kit)
+                drawRoundRect(Color(0xFF05070A), Offset(187f, 59.6f), Size(8f, 3.2f), CornerRadius(0.8f))
+                for (i in 0..2) drawLine(Color(0xFF455A64), Offset(188.4f + i * 2.4f, 59.8f), Offset(188.4f + i * 2.4f, 62.6f), 0.5f)
+                drawRect(acc, Offset(184f, 63.4f), Size(14f, 0.9f))
             }
-            drawRect(dark2, Offset(52f, 62.4f), Size(92f, 2f))
-            drawPath(p("M3,64 L16,64 L14,61 L3,61 Z"), kit)
+            drawPath(p("M52,62.2 L146,62.2 L150,64.6 L48,64.6 Z"), kit)
+            drawRect(acc, Offset(52f, 62.2f), Size(94f, 0.6f))
+            drawPath(p("M3,64.6 L24,64.6 L20,60.4 L3,60.4 Z"), kit)
+            for (i in 0..3) drawLine(Color(0xFF455A64), Offset(6.5f + i * 4f, 61f), Offset(5f + i * 4.2f, 64.2f), 0.5f)
         }
 
         // faróis e lanternas
@@ -346,11 +383,12 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
         // entrada de ar do turbo
         if ("turbo" in tuning) {
             val sc = Path().apply {
-                moveTo(d.hoodX - 22f, d.hoodY); lineTo(d.hoodX - 17f, d.hoodY - 3.6f)
-                lineTo(d.hoodX - 5f, d.hoodY - 3.6f); lineTo(d.hoodX, d.hoodY); close()
+                moveTo(d.hoodX - 25f, d.hoodY + 0.6f); lineTo(d.hoodX - 20f, d.hoodY - 3.8f)
+                lineTo(d.hoodX - 6f, d.hoodY - 3.8f); lineTo(d.hoodX - 2f, d.hoodY + 0.6f); close()
             }
-            drawPath(sc, Color(0xDD000000))
-            drawLine(Color(0x66FFFFFF), Offset(d.hoodX - 15f, d.hoodY - 2f), Offset(d.hoodX - 7f, d.hoodY - 2f), 0.6f)
+            drawPath(sc, Color(0xFF14181B))
+            drawPath(sc, Color(0x55FFFFFF), style = Stroke(0.5f))
+            for (i in 0..3) drawLine(Color(0xFF3B4A53), Offset(d.hoodX - 19f + i * 3.8f, d.hoodY - 3.2f), Offset(d.hoodX - 20.5f + i * 3.8f, d.hoodY + 0.2f), 0.7f)
         }
     }
 
@@ -359,11 +397,22 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
         withTransform({ translate(0f, dy); rotate(sag * 2f, Offset(100f, 62f)) }) {
             val ax = d.spX
             val ay = d.spY
-            drawRect(Color(0xFF263238), Offset(ax + 1f, ay - 6f), Size(1.8f, 6f))
-            drawRect(Color(0xFF263238), Offset(ax + 11f, ay - 6f), Size(1.8f, 6f))
-            drawRoundRect(dark2, Offset(ax - 4f, ay - 9f), Size(23f, 2.8f), CornerRadius(1f))
-            drawRect(Color(0xFF111111), Offset(ax - 4f, ay - 10.5f), Size(1.4f, 5.5f))
-            drawRect(Color(0xFF111111), Offset(ax + 17.6f, ay - 10.5f), Size(1.4f, 5.5f))
+            val carbon = Color(0xFF14181B)
+            for (sx in listOf(ax + 2.2f, ax + 12.6f)) { // pescoço de cisne
+                drawPath(Path().apply { moveTo(sx, ay + 1f); lineTo(sx + 1.2f, ay - 6.4f); lineTo(sx + 3f, ay - 6.4f); lineTo(sx + 2f, ay + 1f); close() }, carbon)
+            }
+            val wing = Path().apply {
+                moveTo(ax - 5f, ay - 9.2f); lineTo(ax + 21f, ay - 11f)
+                quadraticBezierTo(ax + 23.6f, ay - 10.6f, ax + 22.6f, ay - 8.6f)
+                lineTo(ax - 3.4f, ay - 6.6f); quadraticBezierTo(ax - 6.2f, ay - 7.2f, ax - 5f, ay - 9.2f); close()
+            }
+            drawPath(wing, Brush.verticalGradient(listOf(Color(0xFF4A555C), Color(0xFF0E1113)), ay - 11f, ay - 6.6f))
+            drawLine(Color(0x99FFFFFF), Offset(ax - 3.4f, ay - 8.9f), Offset(ax + 20f, ay - 10.6f), 0.5f)
+            drawLine(Color(0xFFD32F2F), Offset(ax - 3f, ay - 7f), Offset(ax + 21.4f, ay - 8.9f), 0.7f)
+            for (ex in listOf(ax - 5.4f, ax + 21.6f)) { // laterais
+                drawPath(Path().apply { moveTo(ex, ay - 13f); lineTo(ex + 1.9f, ay - 13.2f); lineTo(ex + 1.9f, ay - 6f); lineTo(ex, ay - 6.4f); close() }, carbon)
+                drawLine(Color(0xFFD32F2F), Offset(ex + 0.95f, ay - 12.4f), Offset(ex + 0.95f, ay - 7.4f), 0.5f)
+            }
         }
     }
 
@@ -380,8 +429,8 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
     // rodas
     val flat = pn < 30
     val worn = pn < 55
-    val gold = "rodas" in tuning
-    val rimC = if (gold) Color(0xFFFFC107) else Color(0xFFB0BEC5)
+    val sport = "rodas" in tuning
+    val rimC = if (sport) Color(0xFF2A2F33) else Color(0xFFB0BEC5)
     for (wx in listOf(d.wx, d.wx2)) {
         val r = d.r
         drawArc(Color(0xFF0D0D0D), 180f, 180f, true, Offset(wx - r - 3f, groundCy - r - 3f), Size((r + 3f) * 2, (r + 3f) * 2))
@@ -392,13 +441,27 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
         drawCircle(Color(0xFF262626), rr * 0.8f, Offset(wx, cy)) // lateral do pneu
         drawCircle(rimC, rr * 0.62f, Offset(wx, cy))
         drawCircle(Color(0x66FFFFFF), rr * 0.62f, Offset(wx, cy), style = Stroke(0.5f))
-        if (gold) {
+        if (sport) {
+            drawCircle(Color(0xFFDDE3E6), rr * 0.64f, Offset(wx, cy))                                   // aro polido
+            drawCircle(Color(0xFF1B1F22), rr * 0.57f, Offset(wx, cy))
+            drawCircle(Color(0xFF9AA3A8), rr * 0.46f, Offset(wx, cy))                                   // disco de freio
+            drawCircle(Color(0xFF454C50), rr * 0.46f, Offset(wx, cy), style = Stroke(0.5f))
+            drawArc(Color(0xFFD32F2F), 200f, 72f, false, Offset(wx - rr * 0.5f, cy - rr * 0.5f), Size(rr, rr), style = Stroke(rr * 0.2f)) // pinça
+            for (k in 0 until 5) {
+                val a = k * 2f * PI.toFloat() / 5f + 0.2f
+                for (o in listOf(-0.16f, 0.16f)) {
+                    val a2 = a + o
+                    drawLine(Color(0xFF2C3236), Offset(wx + cos(a) * rr * 0.1f, cy + sin(a) * rr * 0.1f), Offset(wx + cos(a2) * rr * 0.57f, cy + sin(a2) * rr * 0.57f), rr * 0.13f)
+                    drawLine(Color(0xFF8E999F), Offset(wx + cos(a) * rr * 0.1f, cy + sin(a) * rr * 0.1f), Offset(wx + cos(a2) * rr * 0.57f, cy + sin(a2) * rr * 0.57f), 0.5f)
+                }
+            }
+            drawCircle(Color(0xFFCFD8DC), rr * 0.2f, Offset(wx, cy))
             for (k in 0 until 5) {
                 val a = k * 2f * PI.toFloat() / 5f
-                drawLine(Color(0xFF8A6A00), Offset(wx, cy), Offset(wx + cos(a) * rr * 0.6f, cy + sin(a) * rr * 0.6f), 1f)
+                drawCircle(Color(0xFF37474F), rr * 0.03f, Offset(wx + cos(a) * rr * 0.12f, cy + sin(a) * rr * 0.12f))
             }
         } else {
-            drawCircle(Color(0xFF546E7A), rr * 0.48f, Offset(wx, cy)) // disco de freio
+            drawCircle(Color(0xFF546E7A), rr * 0.48f, Offset(wx, cy))
             for (k in 0 until 5) {
                 val a = k * 2f * PI.toFloat() / 5f + 0.3f
                 drawLine(Color(0xFFECEFF1), Offset(wx, cy), Offset(wx + cos(a) * rr * 0.58f, cy + sin(a) * rr * 0.58f), 1.5f)
