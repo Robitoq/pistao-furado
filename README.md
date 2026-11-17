@@ -35,3 +35,13 @@ m("Marca", "Modelo", valorEmReais, Corpo, Categoria, anoInicial, anoFinal),
 ```
 
 Os valores e anos do catálogo são aproximados, feitos só para o jogo.
+
+## Carro novo (vetor, sem foto)
+
+O carro agora é **desenhado no código** (`CarArt.kt`), não é mais uma imagem pintada com filtro, então a cor não bugua mais.
+
+- **Formas**: tabela `CAR_SHAPES` (13 carrocerias). Cada uma é uma lista de pontos, é só editar.
+- **Destruição**: objeto `Wear` (quantidade de ferrugem, desbotado, sujeira, amassados) e `RustColors`.
+- **Lataria** → ferrugem, tinta descascada, massa/primer, amassados, porta de outra cor, farol quebrado, para-choque pendurado, vidro trincado.
+- **Motor** → fumaça cinza/preta e faíscas. **Pneus** → careca, calota enferrujada, furado. **Interior** → banco rasgado. **Suspensão** → traseira arriada.
+- **Tuning** → rebaixada (`Wear.LOWER`), rodas, neon, película, adesivo, escape, turbo, som, couro, aerofólio, para-choque.
