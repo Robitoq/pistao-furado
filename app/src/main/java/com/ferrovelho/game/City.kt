@@ -142,14 +142,23 @@ private fun DrawScope.sp(
     }
 }
 
+private val CMAN: List<String> = listOf(
+    "..hhhh..", ".hhhhhh.", ".hssssh.", ".sesses.", ".ssssss.", "..ssss..", ".cccccc.",
+    "sccccccs", "sccccccs", "sccccccs", ".pppppp.", ".pp..pp.", ".pp..pp.", ".oo..oo.",
+)
+private val CWOMAN: List<String> = listOf(
+    "..hhhh..", ".hhhhhh.", "hhsssshh", "hsessesh", "hssssssh", "h.ssss.h", "hcccccch",
+    "sccccccs", ".cccccc.", "..cccc..", ".pppppp.", ".pppppp.", ".ss..ss.", ".oo..oo.",
+)
+
 private fun DrawScope.person(look: BuyerLook, wx: Float, feetY: Float, cam: Float, s: Float, faceLeft: Boolean, bob: Float) {
-    val rows = if (look.female) WOMAN else MAN
+    val rows: List<String> = if (look.female) CWOMAN else CMAN
     val cell = 1.8f * s
     val left = (wx - cam) * s - 4f * cell
     if (left < -cell * 10 || left > size.width) return
     val top = feetY * s - rows.size * cell - bob * s
     drawOval(Color(0x44000000), Offset(left, feetY * s - cell * 0.6f), Size(8 * cell, cell * 1.2f))
-    rows.forEachIndexed { y, row ->
+    rows.forEachIndexed { y: Int, row: String ->
         for (xi in 0 until 8) {
             val c = row[if (faceLeft) 7 - xi else xi]
             val col = when (c) {
