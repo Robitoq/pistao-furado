@@ -51,3 +51,15 @@ O carro agora é **desenhado no código** (`CarArt.kt`), não é mais uma imagem
 - **Bugs de camada corrigidos**: janelas acesas, estrelas e letreiros não aparecem mais por cima de pessoas, carros e balões de fala. Balões não saem da tela nem se empilham.
 - **Menos cara de IA**: prédios do fundo irregulares (antena, caixa d'água, janelas acesas variadas), calçada com juntas e rachaduras diferentes, bueiros, remendos de asfalto, poças, faixa gasta, fios com passarinho, lixeiras, sacos de lixo, gatos e vasos de planta, postes em espaçamento irregular.
 - **Falas mais naturais** (`IDLE_LINES` e `PED_LINES` em `City.kt`).
+
+## Encontro de carros 🏁
+
+- Fica na cidade (entre o Desmanche Central e o Pátio Premium). Abre às **18h**, uma participação por dia.
+- Você escolhe um carro da garagem e concorre com 5 donos de carro (`Meet.kt`).
+- Cada carro ganha **Beleza** (lataria, interior e tuning) e **Estado** (motor, pneus, suspensão), de 0 a 10, e uma nota final.
+- Pódio com 1º, 2º e 3º lugar. Prêmios em `MEET_PRIZES` (R$ 4.000 / 2.000 / 800).
+
+## Casa 🏠
+
+- Fica no começo da cidade. De noite (a partir das 19h) é só chamar o **🚕 Táxi → Casa**: ele leva, o personagem dorme e acorda no dia seguinte, às 8h, na porta de casa (`Home.kt`).
+- Depois das 23h20 o personagem oferece sozinho o táxi pra casa.

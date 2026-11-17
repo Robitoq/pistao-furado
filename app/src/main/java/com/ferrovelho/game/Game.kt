@@ -167,6 +167,9 @@ class GameState(context: Context) {
     var message by mutableStateOf("")
     var sold by mutableStateOf(0)
     var totalProfit by mutableStateOf(0)
+    var meetDay by mutableStateOf(0)    // último dia em que participou do encontro de carros
+    var meetWins by mutableStateOf(0)   // quantas vezes ficou em 1º lugar
+    var meetBest by mutableStateOf(0)   // melhor colocação (0 = nunca participou)
 
     private var nextId = 1
     private var seed = Random.nextInt()
@@ -245,6 +248,9 @@ class GameState(context: Context) {
         garage = emptyList()
         sold = 0
         totalProfit = 0
+        meetDay = 0
+        meetWins = 0
+        meetBest = 0
         nextId = 1
         seed = Random.nextInt()
         yards = genYards(Random(System.nanoTime()))
@@ -434,6 +440,9 @@ class GameState(context: Context) {
         o.put("slots", slots)
         o.put("sold", sold)
         o.put("profit", totalProfit)
+        o.put("meetDay", meetDay)
+        o.put("meetWins", meetWins)
+        o.put("meetBest", meetBest)
         o.put("nextId", nextId)
         o.put("seed", seed)
         o.put("minutes", minutes)
@@ -470,6 +479,9 @@ class GameState(context: Context) {
             slots = o.getInt("slots")
             sold = o.getInt("sold")
             totalProfit = o.getInt("profit")
+            meetDay = o.optInt("meetDay", 0)
+            meetWins = o.optInt("meetWins", 0)
+            meetBest = o.optInt("meetBest", 0)
             nextId = o.getInt("nextId")
             seed = o.getInt("seed")
             minutes = o.optInt("minutes", 8 * 60)

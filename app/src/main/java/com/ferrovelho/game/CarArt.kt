@@ -192,13 +192,14 @@ fun CarArt(
     tuning: List<String>,
     cond: List<Int>,
     modifier: Modifier = Modifier,
+    driverOverride: Look? = null,
 ) {
     val ctx = LocalContext.current
     val sh = remember(body) { shapeFor(body) }
     val paint = Color(PAINTS[colorIdx.coerceIn(0, PAINTS.lastIndex)].second)
     val anim = rememberInfiniteTransition(label = "fx")
     val t by anim.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart), label = "t")
-    val driver = remember { loadProfile(ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE))?.look }
+    val driver = remember(driverOverride) { driverOverride ?: loadProfile(ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE))?.look }
     val seed = body.ordinal * 17 + colorIdx * 5 + 3
     Canvas(modifier) {
         try {
