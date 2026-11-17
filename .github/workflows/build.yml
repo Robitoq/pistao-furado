@@ -5,11 +5,25 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Arrumar arquivos enviados soltos
+        run: |
+          G=app/src/main/java/com/ferrovelho/game
+          mkdir -p "$G"
+          for f in CarArt Cars Dialog Game Ui MainActivity; do
+            if [ -f "$f.kt" ]; then cp "$f.kt" "$G/$f.kt"; fi
+          done
+          for f in "build.gradle.kts" "build.gradle (1).kts"; do
+            if [ -f "$f" ] && grep -q "signingConfigs" "$f"; then cp "$f" app/build.gradle.kts; fi
+          done
+          if [ ! -f ferrovelho.jks ] && [ -f "ferrovelho (2).jks" ]; then cp "ferrovelho (2).jks" ferrovelho.jks; fi
       - name: Garantir build.gradle.kts da raiz
         run: |
           cat > build.gradle.kts <<'EOT'
@@ -32,3 +46,12 @@ jobs:
         with:
           name: FerroVelho-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Renomear APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk FerroVelho.apk
+      - name: Publicar release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Ferro Velho v${{ github.run_number }}
+          files: FerroVelho.apk
+          make_latest: true
