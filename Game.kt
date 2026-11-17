@@ -54,11 +54,6 @@ val TUNINGS = listOf(
     Tuning("turbo", "🚀 Kit turbo", 6000, 0.120, 0.100),
     Tuning("aerofolio", "🏎️ Aerofólio", 1800, 0.035, 0.030),
     Tuning("parachoque", "🛡️ Kit para-choque esportivo", 2200, 0.040, 0.035),
-    Tuning("led", "💎 Faróis de LED (angel eyes)", 1800, 0.030, 0.022),
-    Tuning("capo", "🧪 Capô de fibra de carbono", 2600, 0.040, 0.030),
-    Tuning("milha", "🔦 Faróis de milha", 900, 0.015, 0.012),
-    Tuning("santo", "🪖 Santo Antônio / bagageiro", 1400, 0.025, 0.020),
-    Tuning("fosco", "🎨 Pintura fosca", 3500, 0.060, 0.050),
 )
 
 class Buyer(
@@ -97,11 +92,13 @@ val EVENTS = listOf(
 /** Sazonalidade por mês (jan = IPVA, dez = 13º salário). */
 val SEASON = listOf(0.95, 0.98, 1.0, 1.0, 1.0, 1.0, 1.02, 1.0, 1.0, 1.0, 1.01, 1.04)
 
-val YARD_NAMES = listOf("Ferro Velho do Zé", "Desmanche Central", "Pátio Premium")
+val YARD_NAMES = listOf("Ferro Velho do Zé", "Desmanche Central", "Pátio Premium", "Sucata do Beto", "Pátio do Rodrigo")
 val YARD_DESC = listOf(
     "Carros baratos e batidos (até ~R$ 60 mil de valor)",
     "De tudo um pouco (R$ 20 mil a R$ 160 mil)",
     "Esportivos, SUVs e importados (a partir de R$ 100 mil)",
+    "Lataria barata e história esquisita (até ~R$ 40 mil)",
+    "Carros honestos de meio de faixa (R$ 40 mil a R$ 130 mil)",
 )
 
 data class OwnedCar(
@@ -269,14 +266,16 @@ class GameState(context: Context) {
         save()
     }
 
-    private fun genYards(rnd: Random): List<List<YardCar>> = List(3) { yi ->
+    private fun genYards(rnd: Random): List<List<YardCar>> = List(5) { yi ->
         val lo: Int
         val hi: Int
         val n: Int
         when (yi) {
             0 -> { lo = 0; hi = 60000; n = 5 }
             1 -> { lo = 20000; hi = 160000; n = 5 }
-            else -> { lo = 100000; hi = Int.MAX_VALUE; n = 4 }
+            2 -> { lo = 100000; hi = Int.MAX_VALUE; n = 4 }
+            3 -> { lo = 0; hi = 40000; n = 4 }
+            else -> { lo = 40000; hi = 130000; n = 4 }
         }
         val pool = CATALOG.indices.filter { CATALOG[it].base in lo..hi }
         List(n) {
@@ -484,7 +483,8 @@ class GameState(context: Context) {
                 val a = ys.getJSONArray(yi)
                 List(a.length()) { a.getJSONObject(it).toYard() }
             }
-            if (yards.size != 3) throw IllegalStateException("save antigo")
+            if (yards.size < 3) throw IllegalStateException("save antigo")
+            if (yards.size < 5) yards = yards + genYards(Random(System.nanoTime())).drop(yards.size)
             message = ""
         } catch (e: Exception) {
             newGame()
