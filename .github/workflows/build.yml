@@ -15,6 +15,7 @@ jobs:
           G=app/src/main/java/com/ferrovelho/game
           [ -f Dialog.kt ] && cp Dialog.kt $G/Dialog.kt
           [ -f CarArt.kt ] && cp CarArt.kt $G/CarArt.kt
+          [ -f Cars.kt ] && cp Cars.kt $G/Cars.kt
           [ -f app_build.gradle.kts ] && cp app_build.gradle.kts app/build.gradle.kts
           ls -la ferrovelho.jks
       - uses: actions/setup-java@v4
