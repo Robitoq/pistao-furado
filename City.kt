@@ -289,6 +289,24 @@ private fun DrawScope.label(p: Paint, txt: String, wx: Float, y: Float, cam: Flo
     drawContext.canvas.nativeCanvas.drawText(txt, (wx - cam) * s, y * s, p)
 }
 
+private val IDLE_LINES = listOf(
+    "Será que hoje acho um carro bom?", "Preciso de dinheiro pra uma oficina...",
+    "Esse bairro tem cada carro...", "Dizem que o Seu Zé pechincha fácil.",
+    "Um carro bem barato e eu faço fortuna!", "Tá um dia bonito pra negociar.",
+)
+private val PED_LINES = listOf("Oi, {n}!", "Bom dia!", "Cuidado na rua!", "Tá procurando carro?", "Fala, {n}!", "Tá quente hoje, hein?")
+
+private fun DrawScope.bubble(p: Paint, txt: String, wx: Float, bottomY: Float, cam: Float, s: Float) {
+    p.textSize = 5.2f * s
+    val tw = p.measureText(txt) / s
+    val bw = tw + 6f
+    val x = wx - bw / 2f
+    wr(Color(0xFF212121), x - 0.6f, bottomY - 10.6f, bw + 1.2f, 10.2f, cam, s)
+    wr(Color(0xFFFFFFFF), x, bottomY - 10f, bw, 9f, cam, s)
+    wr(Color(0xFFFFFFFF), wx - 1.5f, bottomY - 1f, 3f, 2f, cam, s)
+    label(p, txt, wx, bottomY - 3.4f, cam, s, 5.2f, 0xFF212121.toInt())
+}
+
 fun DrawScope.glow(center: Offset, radius: Float, c: Color) {
     drawCircle(
         Brush.radialGradient(listOf(c, c.copy(alpha = 0f)), center, radius), radius, center,
@@ -337,16 +355,32 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var mask by remember { mutableIntStateOf(prefs.getInt("mask", 0)) }
     var talk by remember { mutableStateOf<Pair<Int, Boolean>?>(null) }
     var taxi by remember { mutableStateOf(false) }
+    var say by remember { mutableStateOf<String?>("Bora achar uma pechincha!") }
+    var sayUntil by remember { mutableFloatStateOf(4f) }
     val near by remember { derivedStateOf { YARD_X.indexOfFirst { abs(px - it) < 30f } } }
 
     DisposableEffect(Unit) { onDispose { prefs.edit().putFloat("x", px).apply() } }
     LaunchedEffect(Unit) {
         var last = 0L
+        var idle = 0f
+        var lastNear = -1
+        var saidNight = false
         while (true) {
             withFrameNanos { n ->
                 if (last != 0L) {
                     val dt = ((n - last) / 1e9f).coerceAtMost(0.05f)
                     time += dt
+                    idle = if (dir == 0) idle + dt else 0f
+                    if (say != null && time > sayUntil) say = null
+                    if (say == null && idle > 7f) { say = IDLE_LINES[Random.nextInt(IDLE_LINES.size)]; sayUntil = time + 3.5f; idle = 0f }
+                    val nn = YARD_X.indexOfFirst { abs(px - it) < 45f }
+                    if (nn != lastNear) {
+                        lastNear = nn
+                        if (nn >= 0) { say = "Olha o ${YARD_NAMES[nn]}!"; sayUntil = time + 3f }
+                    }
+                    val nf = nightF(g.minutes)
+                    if (nf > 0.6f && !saidNight) { saidNight = true; say = "Já escureceu... será que ainda dá tempo?"; sayUntil = time + 4f }
+                    if (nf < 0.2f) saidNight = false
                     if (dir != 0 && talk == null && !taxi) {
                         px = (px + dir * (if (run) 135f else 75f) * dt).coerceIn(20f, WORLD - 20f)
                         face = dir
@@ -467,7 +501,16 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 // jogador
                 drawChar(look, (px - 6f - cam) * s, (115f - 26f) * s, s, face < 0, if (moving) 1f else 0f,
                     t * (if (run) 16f else 10f))
-                label(paint, me.name, px, 84f, cam, s, 6f, 0xFFFFFFFF.toInt())
+                val sayNow = say
+                if (sayNow != null) bubble(paint, sayNow, px, 84f, cam, s)
+                else label(paint, me.name, px, 84f, cam, s, 6f, 0xFFFFFFFF.toInt())
+                for ((pi, pd) in peds.withIndex()) {
+                    val a = t * 0.4f + pd.phase
+                    val wx = pd.base + sin(a) * 60f
+                    if (abs(wx - px) < 32f && ((t * 0.25f + pd.phase).toInt() % 3 == 0)) {
+                        bubble(paint, PED_LINES[(pi + (t * 0.25f + pd.phase).toInt() / 3) % PED_LINES.size].replace("{n}", me.name), wx, 84f, cam, s)
+                    }
+                }
 
                 // trânsito
                 for (c in traffic) {
@@ -733,6 +776,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, first: Boolean, allDo
     var speech by remember { mutableStateOf(lines[0]) }
     var picked by remember { mutableStateOf<YardCar?>(null) }
     val y = picked
+    var you by remember { mutableStateOf<String?>(null) }
     var cur by remember(y?.id) { mutableIntStateOf(y?.price ?: 0) }
     var patience by remember(y?.id) { mutableIntStateOf(if (mood == 2) 3 else 2) }
     val chance = (o.easy * 0.7 + (if (mood == 2) 0.25 else 0.0) + 0.1).coerceIn(0.05, 0.95)
@@ -743,6 +787,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, first: Boolean, allDo
         if (mood == 0) { speech = "Já falei: hoje não negocio. O preço é ${brl(c.price)}."; return }
         if (patience <= 0) { speech = "Já deu, $pname. Esse preço é final."; return }
         val want = roundTo50(c.price * (100 - pct) / 100.0)
+        you = "E se eu pagar ${brl(want)}?"
         val floor = roundTo50(c.price * (1 - o.maxDisc * 0.8))
         if (want >= cur) { speech = "Isso é mais do que eu pedi. Pode pagar à vontade!"; return }
         if (want >= floor && Random.nextDouble() < chance) {
@@ -763,6 +808,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, first: Boolean, allDo
                     Column {
                         Text(o.name + when (mood) { 0 -> "  😠"; 2 -> "  😄"; else -> "  😐" }, fontWeight = FontWeight.Bold)
                         Text(speech, fontSize = 14.sp)
+                        you?.let { Text("$pname: $it", fontSize = 13.sp, color = Color(0xFF90CAF9)) }
                     }
                 }
                 if (idx < lines.size - 1 && y == null) {
@@ -796,6 +842,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, first: Boolean, allDo
                     }
                     OutlinedButton(onClick = {
                         val w = y.cond.indices.minByOrNull { y.cond[it] } ?: 0
+                        you = "Qual é o defeito dele?"
                         speech = "O pior dele é ${PART_NAMES[w].lowercase()}. O resto dá pro gasto."
                     }, Modifier.fillMaxWidth()) { Text("Perguntar do carro") }
                     Button(onClick = {
@@ -803,6 +850,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, first: Boolean, allDo
                         if (g.yards.getOrNull(yi).orEmpty().any { it.id == y.id }) {
                             speech = g.message
                         } else {
+                            you = "Fechado! Valeu, ${o.name}."
                             speech = "Fechado, $pname! Cuida bem dele."
                             picked = null
                             idx = lines.size - 1

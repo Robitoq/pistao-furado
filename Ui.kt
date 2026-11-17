@@ -1,6 +1,8 @@
 package com.ferrovelho.game
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 
@@ -8,7 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -73,8 +77,21 @@ fun FerroVelhoApp(g: GameState) {
     var askReset by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { while (true) { delay(1000); g.clockTick() } }
 
+    var blackout by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var goNext by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(goNext) {
+        if (goNext) {
+            for (a in listOf(0.7f, 0.1f, 0.9f, 0.3f, 1f)) { blackout = a; delay(110) }
+            g.nextDay()
+            blackout = 1f
+            delay(500)
+            for (a in listOf(0.6f, 0.9f, 0.3f, 0.5f, 0.1f, 0f)) { blackout = a; delay(120) }
+            goNext = false
+        }
+    }
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     Scaffold(
-        topBar = { TopStatus(g) },
+        topBar = { TopStatus(g) { goNext = true } },
         bottomBar = {
             NavigationBar {
                 val tabs = listOf("🚗" to "Ferro Velho", "🔧" to "Garagem", "📊" to "Resumo", "🏙️" to "Cidade")
@@ -107,6 +124,12 @@ fun FerroVelhoApp(g: GameState) {
         }
     }
 
+    if (blackout > 0f) androidx.compose.foundation.layout.Box(
+        Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = blackout))
+            .pointerInput(Unit) { detectTapGestures { } },
+    )
+    }
+
     if (askReset) {
         AlertDialog(
             onDismissRequest = { askReset = false },
@@ -121,7 +144,7 @@ fun FerroVelhoApp(g: GameState) {
 }
 
 @Composable
-private fun TopStatus(g: GameState) {
+private fun TopStatus(g: GameState, onNext: () -> Unit) {
     Surface(tonalElevation = 3.dp) {
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -133,7 +156,13 @@ private fun TopStatus(g: GameState) {
                 Text("Dia ${g.day} • mercado ${(g.marketIndex() * 100).roundToInt()}% ${g.trendArrow()}", fontSize = 12.sp)
                 g.event?.let { Text("${it.title} — ${it.text}", fontSize = 11.sp) }
             }
-            Button(onClick = { g.nextDay() }) { Text("Próximo dia ▶") }
+            var snd by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Music.enabled) }
+            val sctx = androidx.compose.ui.platform.LocalContext.current
+            Text(
+                if (snd) "🔊" else "🔇", fontSize = 22.sp,
+                modifier = Modifier.clickable { snd = Music.toggle(sctx.applicationContext) }.padding(end = 10.dp),
+            )
+            Button(onClick = onNext) { Text("Próximo dia ▶") }
         }
     }
 }
@@ -291,49 +320,20 @@ private fun CarScreen(g: GameState, car: OwnedCar, onBack: () -> Unit) {
         )
 
         SectionTitle("🔧 Reparos")
-        PART_NAMES.forEachIndexed { i, name ->
-            val v = car.cond[i]
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(name, Modifier.width(84.dp), fontSize = 13.sp)
-                    LinearProgressIndicator(
-                        progress = { v / 100f },
-                        modifier = Modifier.weight(1f).height(8.dp),
-                        color = condColor(v),
-                    )
-                    Text("$v%", Modifier.width(44.dp), fontSize = 12.sp, textAlign = TextAlign.End)
-                }
-                if (v < MAX_COND) {
-                    Row(Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val up = min(MAX_COND, v + 10)
-                        OutlinedButton(onClick = { g.repair(car.id, i, up) }) {
-                            Text("+${up - v} · ${brl(g.repairCost(car, i, up))}", fontSize = 12.sp)
-                        }
-                        FilledTonalButton(onClick = { g.repair(car.id, i, MAX_COND) }) {
-                            Text("100% · ${brl(g.repairCost(car, i, MAX_COND))}", fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-        }
+        PART_NAMES.forEachIndexed { i, name -> RepairCard(g, car, i, name) }
         if (g.repairAllCost(car) > 0) {
-            Button(onClick = { g.repairAll(car.id) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Reparar tudo · ${brl(g.repairAllCost(car))}")
-            }
+            Button(
+                onClick = { g.repairAll(car.id) },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+            ) { Text("🛠️ Reparar tudo · ${brl(g.repairAllCost(car))}", fontWeight = FontWeight.Bold) }
         }
 
         SectionTitle("🎛️ Tuning")
-        TUNINGS.forEach { t ->
-            val has = t.id in car.tuning
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(t.name, Modifier.weight(1f), fontSize = 14.sp)
-                if (has) {
-                    Text("instalado ✓", color = GREEN, fontSize = 13.sp)
-                } else {
-                    OutlinedButton(onClick = { g.install(car.id, t) }) {
-                        Text(brl(g.tuningPrice(car, t)), fontSize = 12.sp)
-                    }
-                }
+        TUNINGS.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { t -> TuningCard(g, car, t, Modifier.weight(1f)) }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
 
@@ -421,6 +421,96 @@ private fun MarketChart(h: List<Double>) {
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             drawPath(path, line, style = Stroke(4f))
+        }
+    }
+}
+
+
+// ------------------------------------------------------------------ cards bonitos (reparo / tuning)
+
+private val PART_ICONS = listOf("⚙️", "🚪", "🛞", "💺", "🔩")
+
+@Composable
+private fun RepairCard(g: GameState, car: OwnedCar, i: Int, name: String) {
+    val v = car.cond[i]
+    val (label, col) = when {
+        v < 25 -> "Péssimo" to RED
+        v < 50 -> "Ruim" to Color(0xFFFF9800)
+        v < 75 -> "Regular" to Color(0xFFFFCA28)
+        v < 95 -> "Bom" to Color(0xFF9CCC65)
+        else -> "Ótimo" to GREEN
+    }
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    androidx.compose.material3.Card(
+        shape = shape,
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color(0xFF2A2733)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(col.copy(alpha = 0.18f)).border(1.5.dp, col, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { Text(PART_ICONS.getOrElse(i) { "🔧" }, fontSize = 18.sp) }
+                Column(Modifier.weight(1f)) {
+                    Text(name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(label, color = col, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Text("$v%", color = col, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            }
+            Box(Modifier.fillMaxWidth().height(10.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp)).background(Color(0xFF14121A))) {
+                Box(
+                    Modifier.fillMaxWidth(v.coerceIn(0, 100) / 100f).fillMaxHeight()
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
+                        .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(col.copy(alpha = 0.7f), col))),
+                )
+            }
+            if (v < MAX_COND) {
+                val up = min(MAX_COND, v + 10)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = { g.repair(car.id, i, up) }, Modifier.weight(1f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    ) { Text("+${up - v}  ${brl(g.repairCost(car, i, up))}", fontSize = 12.sp) }
+                    Button(
+                        onClick = { g.repair(car.id, i, MAX_COND) }, Modifier.weight(1f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    ) { Text("100%  ${brl(g.repairCost(car, i, MAX_COND))}", fontSize = 12.sp) }
+                }
+            } else {
+                Text("✓ Perfeito", color = GREEN, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TuningCard(g: GameState, car: OwnedCar, t: Tuning, modifier: Modifier) {
+    val has = t.id in car.tuning
+    val accent = if (has) GREEN else Color(0xFFB39DDB)
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    val emoji = t.name.takeWhile { !it.isLetter() }.trim()
+    val title = t.name.dropWhile { !it.isLetter() }
+    androidx.compose.material3.Card(
+        shape = shape,
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color(0xFF2A2733)),
+        modifier = modifier.border(1.5.dp, if (has) GREEN else Color(0x33FFFFFF), shape),
+    ) {
+        Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(emoji, fontSize = 26.sp)
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center, minLines = 2, maxLines = 2)
+            Text("+${(t.valuePct * 100).roundToInt()}% valor", color = accent, fontSize = 11.sp)
+            if (has) {
+                Text("✓ Instalado", color = GREEN, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            } else {
+                FilledTonalButton(
+                    onClick = { g.install(car.id, t) },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                ) { Text(brl(g.tuningPrice(car, t)), fontSize = 12.sp) }
+            }
         }
     }
 }
