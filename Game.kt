@@ -54,6 +54,11 @@ val TUNINGS = listOf(
     Tuning("turbo", "🚀 Kit turbo", 6000, 0.120, 0.100),
     Tuning("aerofolio", "🏎️ Aerofólio", 1800, 0.035, 0.030),
     Tuning("parachoque", "🛡️ Kit para-choque esportivo", 2200, 0.040, 0.035),
+    Tuning("led", "💎 Faróis de LED (angel eyes)", 1800, 0.030, 0.022),
+    Tuning("capo", "🧪 Capô de fibra de carbono", 2600, 0.040, 0.030),
+    Tuning("milha", "🔦 Faróis de milha", 900, 0.015, 0.012),
+    Tuning("santo", "🪖 Santo Antônio / bagageiro", 1400, 0.025, 0.020),
+    Tuning("fosco", "🎨 Pintura fosca", 3500, 0.060, 0.050),
 )
 
 class Buyer(

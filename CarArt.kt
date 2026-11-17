@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -152,6 +153,9 @@ fun CarArt(
     tuning: List<String>,
     cond: List<Int>,
     modifier: Modifier = Modifier,
+    brand: String = "",
+    name: String = "",
+    year: Int = 2005,
 ) {
     val sh = remember(body) { shapeOf(body) }
     val anim = rememberInfiniteTransition(label = "smoke")
@@ -164,13 +168,18 @@ fun CarArt(
         val ox = (size.width - 200f * s) / 2f
         val oy = (size.height - 80f * s) / 2f
         withTransform({ translate(ox, oy); scale(s, s, Offset.Zero) }) {
-            drawCar(sh, paint, tuning, cond, t)
+            drawCar(sh, paint, tuning, cond, t, brand, name, year)
         }
     }
 }
 
-private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, cond: List<Int>, t: Float) {
+private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, cond: List<Int>, t: Float, brand: String, name: String, year: Int) {
     val d = sh.d
+    val modern = year >= 2008
+    val nm = name.lowercase()
+    val roundLamp = listOf("fusca", "kombi", "jeep", "bandeirante", "cooper", "911", "wrangler", "defender", "willys").any { it in nm }
+    val led = "led" in tuning
+    val fosco = "fosco" in tuning
     val motor = cond.getOrElse(0) { 100 }
     val lat = cond.getOrElse(1) { 100 }
     val pn = cond.getOrElse(2) { 100 }
@@ -210,6 +219,10 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
 
         // carroceria
         drawPath(sh.body, Brush.verticalGradient(listOf(light, paintC, dark), 22f, 64f))
+        if (fosco) {
+            val gray = Color(0xFF55595C)
+            drawPath(sh.body, Brush.verticalGradient(listOf(lerp(paintC, gray, 0.5f), lerp(dark, gray, 0.55f)), 22f, 64f))
+        }
         drawPath(sh.body, Color(0x66000000), style = Stroke(0.8f))
         sh.bed?.let { drawPath(it, Color(0xFF263238)) }
 
@@ -278,13 +291,20 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
 
         clipPath(sh.body) {
             drawRect(Color(0x22000000), Offset(0f, 59f), Size(200f, 6f))
-            drawRect(Color(0x26FFFFFF), Offset(0f, 44f), Size(200f, 3f))      // reflexo da lateral
+            if (!fosco) drawRect(Color(0x26FFFFFF), Offset(0f, 44f), Size(200f, 3f))      // reflexo da lateral
             drawLine(Color(0x44FFFFFF), Offset(10f, 50f), Offset(184f, 50f), 0.6f) // vinco
             drawLine(Color(0x33000000), Offset(10f, 51f), Offset(184f, 51f), 0.6f)
             if ("adesivo" in tuning) {
                 drawPath(Path().apply { moveTo(0f, 53.4f); lineTo(178f, 53.4f); lineTo(169f, 57.6f); lineTo(0f, 57.6f); close() }, Color(0xE8F5F5F5))
                 drawPath(Path().apply { moveTo(0f, 58.6f); lineTo(165f, 58.6f); lineTo(162f, 59.9f); lineTo(0f, 59.9f); close() }, Color(0xFFE53935))
                 drawRect(Color(0x30000000), Offset(0f, 57.1f), Size(170f, 0.5f))
+            }
+            if ("capo" in tuning) {
+                val hx0 = d.hoodX; val hy = d.hoodY
+                drawPath(Path().apply { moveTo(hx0 - 26f, hy - 4f); lineTo(hx0 + 18f, hy + 1.8f); lineTo(hx0 + 18f, hy + 6f); lineTo(hx0 - 26f, hy + 1f); close() }, Color(0xFF12161A))
+                for (k in 0..9) drawLine(Color(0x33FFFFFF), Offset(hx0 - 26f + k * 4.6f, hy - 3.6f + k * 0.5f), Offset(hx0 - 22f + k * 4.6f, hy + 1.2f + k * 0.5f), 0.5f)
+                drawLine(Color(0xFFE53935), Offset(hx0 - 26f, hy + 1.2f), Offset(hx0 + 18f, hy + 6.2f), 0.6f)
+                drawLine(Color(0x88FFFFFF), Offset(hx0 - 26f, hy - 4f), Offset(hx0 + 18f, hy + 1.8f), 0.5f)
             }
             // amassados
             if (lat < 70) {
@@ -346,20 +366,72 @@ private fun DrawScope.drawCar(sh: Shape, paintC: Color, tuning: List<String>, co
             for (i in 0..3) drawLine(Color(0xFF455A64), Offset(6.5f + i * 4f, 61f), Offset(5f + i * 4.2f, 64.2f), 0.5f)
         }
 
+        if ("santo" in tuning) {
+            val bar = Color(0xFF15191C); val hi = Color(0xFFB0BEC5)
+            val bb = sh.bed?.getBounds()
+            if (bb != null) {
+                val bx = bb.right - 4f; val by = bb.top
+                val pts = listOf(Offset(bx, by), Offset(bx - 1f, by - 15f), Offset(bx - 17f, by - 15f), Offset(bx - 24f, by))
+                for (i in 0 until 3) { drawLine(bar, pts[i], pts[i + 1], 2f); drawLine(hi, pts[i], pts[i + 1], 0.5f) }
+                drawLine(bar, Offset(bx - 12f, by - 15f), Offset(bx - 14f, by), 1.2f)
+            } else {
+                val gl = sh.glass.map { it.getBounds() }
+                val top = gl.minOf { it.top }; val l = gl.minOf { it.left } + 8f; val r = gl.maxOf { it.right } - 14f
+                drawLine(bar, Offset(l, top - 3f), Offset(r, top - 3f), 1.5f)
+                drawLine(hi, Offset(l, top - 3.5f), Offset(r, top - 3.5f), 0.5f)
+                for (x in listOf(l + 3f, r - 3f)) drawLine(bar, Offset(x, top - 3f), Offset(x, top), 1.3f)
+                for (k in 1..4) drawLine(bar, Offset(l + k * (r - l) / 5f, top - 3f), Offset(l + k * (r - l) / 5f, top - 0.6f), 0.7f)
+            }
+        }
+
         // faróis e lanternas
         val hx = 191f
+        val lc = if (roundLamp) Offset(hx - 2.2f, d.lampY) else Offset(hx - 2.5f, d.lampY + 0.2f)
         val hl = Path().apply {
-            moveTo(hx - 7f, d.lampY - 3f); lineTo(hx + 4f, d.lampY - 3.6f)
-            lineTo(hx + 5f, d.lampY + 2.6f); lineTo(hx - 7f, d.lampY + 2.4f); close()
+            when {
+                roundLamp -> addOval(Rect(hx - 6.4f, d.lampY - 4.2f, hx + 2f, d.lampY + 4.2f))
+                modern -> { moveTo(hx - 9.5f, d.lampY - 2.2f); lineTo(hx + 4.6f, d.lampY - 3.8f); lineTo(hx + 5.4f, d.lampY + 0.8f); lineTo(hx - 8f, d.lampY + 2.4f); close() }
+                else -> { moveTo(hx - 7f, d.lampY - 3f); lineTo(hx + 4f, d.lampY - 3.6f); lineTo(hx + 5f, d.lampY + 2.6f); lineTo(hx - 7f, d.lampY + 2.4f); close() }
+            }
         }
         if (lat < 30) {
             drawPath(hl, Color(0xFF263238))
             drawLine(Color(0xCCFFFFFF), Offset(hx - 4f, d.lampY - 2f), Offset(hx + 2f, d.lampY + 2f), 0.5f)
         } else {
-            drawCircle(Color(0x44FFF59D), 7f, Offset(hx, d.lampY))
-            drawPath(hl, Color(0xFFECEFF1))
-            drawCircle(Color(0xFFFFF59D), 2.4f, Offset(hx - 0.5f, d.lampY - 0.2f))
+            drawCircle(if (led) Color(0x55BFE9FF) else Color(0x44FFF59D), 8f, Offset(hx, d.lampY))
+            drawPath(hl, Color(0xFFF1F4F6))
+            if (roundLamp) {
+                drawCircle(Color(0xFFFFF3B0), 2.6f, lc)
+                drawCircle(Color(0xFFB0BEC5), 4.1f, lc, style = Stroke(0.9f))
+            } else if (modern) {
+                drawCircle(if (led) Color(0xFFB3E5FC) else Color(0xFFFFF59D), 1.9f, lc)
+                drawCircle(Color(0xFF263238), 2.7f, lc, style = Stroke(0.7f))
+                drawLine(Color.White, Offset(hx - 8.4f, d.lampY - 1.4f), Offset(hx + 3.8f, d.lampY - 2.8f), 0.9f)
+            } else {
+                drawCircle(Color(0xFFFFF59D), 2.3f, Offset(hx - 1f, d.lampY))
+            }
+            if (led) drawCircle(Color(0xFF4FC3F7), 3.6f, lc, style = Stroke(0.6f))
             drawPath(hl, Color(0xFF90A4AE), style = Stroke(0.6f))
+        }
+        // emblema da marca na grade
+        val bl = brand.lowercase()
+        val bc = when {
+            "chev" in bl -> Color(0xFFD9A400); "fiat" in bl -> Color(0xFFB71C1C); "volks" in bl || "vw" in bl -> Color(0xFF1E4FA0)
+            "ford" in bl -> Color(0xFF1F4FB4); "toyota" in bl -> Color(0xFFC62828); "honda" in bl -> Color(0xFFD32F2F)
+            "renault" in bl -> Color(0xFFFFC107); "mitsu" in bl -> Color(0xFFD32F2F); "hyundai" in bl -> Color(0xFF455A64)
+            "jeep" in bl -> Color(0xFF2E7D32); "bmw" in bl -> Color(0xFF1565C0); else -> Color(0xFF90A4AE)
+        }
+        val bp = Offset(hx - 1.5f, d.lampY + 6.6f)
+        if ("renault" in bl || "mitsu" in bl) drawPath(Path().apply { moveTo(bp.x, bp.y - 2.2f); lineTo(bp.x + 1.7f, bp.y); lineTo(bp.x, bp.y + 2.2f); lineTo(bp.x - 1.7f, bp.y); close() }, bc)
+        else { drawCircle(bc, 1.8f, bp); drawCircle(Color(0xCCFFFFFF), 1.9f, bp, style = Stroke(0.4f)) }
+        if ("chev" in bl) { drawLine(Color(0xFF3E2723), Offset(bp.x - 1.3f, bp.y), Offset(bp.x + 1.3f, bp.y), 0.5f); drawLine(Color(0xFF3E2723), Offset(bp.x, bp.y - 1.3f), Offset(bp.x, bp.y + 1.3f), 0.5f) }
+        // faróis de milha
+        if ("milha" in tuning) {
+            val mp = Offset(hx - 3f, 60.8f)
+            drawCircle(Color(0x66FFF59D), 6f, mp)
+            drawCircle(Color(0xFF1B1F22), 2.5f, mp)
+            drawCircle(Color(0xFFFFF176), 1.8f, mp)
+            drawCircle(Color(0xFFCFD8DC), 2.5f, mp, style = Stroke(0.5f))
         }
         // pisca, placa e detalhes de porta
         drawRect(Color(0xFFFFB300), Offset(hx - 6f, d.lampY + 2.8f), Size(3.5f, 1.6f))

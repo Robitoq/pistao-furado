@@ -181,7 +181,7 @@ private fun YardCard(g: GameState, yi: Int, y: YardCar) {
                 }
                 Text(brl(y.price), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
             }
-            CarArt(m.body, y.color, emptyList(), y.cond, Modifier.fillMaxWidth().height(110.dp))
+            CarArt(m.body, y.color, emptyList(), y.cond, Modifier.fillMaxWidth().height(110.dp), m.brand, m.name, m.from)
             CondBars(y.cond)
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -246,7 +246,7 @@ private fun GarageScreen(g: GameState, onOpen: (Int) -> Unit) {
             Card(Modifier.fillMaxWidth().clickable { onOpen(car.id) }) {
                 Column(Modifier.padding(12.dp)) {
                     Text("${m.fullName} ${car.year}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    CarArt(m.body, car.color, car.tuning, car.cond, Modifier.fillMaxWidth().height(110.dp))
+                    CarArt(m.body, car.color, car.tuning, car.cond, Modifier.fillMaxWidth().height(110.dp), m.brand, m.name, m.from)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Investido: ${brl(invested)}", fontSize = 12.sp)
@@ -282,7 +282,7 @@ private fun CarScreen(g: GameState, car: OwnedCar, onBack: () -> Unit) {
     ) {
         TextButton(onClick = onBack) { Text("← Voltar à garagem") }
         Text("${m.fullName} ${car.year}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        CarArt(m.body, car.color, car.tuning, car.cond, Modifier.fillMaxWidth().height(170.dp))
+        CarArt(m.body, car.color, car.tuning, car.cond, Modifier.fillMaxWidth().height(170.dp), m.brand, m.name, m.from)
         Text(
             "Pago: ${brl(car.paid)} • Oficina: ${brl(car.spent)} • Total: ${brl(invested)}\n" +
                 "Vale hoje (comprador comum): ${brl(g.marketValue(car))}",
