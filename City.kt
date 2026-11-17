@@ -96,7 +96,11 @@ class CitySprites(
         fun get(ctx: Context): CitySprites = cache ?: load(ctx).also { cache = it }
         fun load(ctx: Context): CitySprites {
             val o = BitmapFactory.Options().apply { inScaled = false }
-            fun img(n: String) = BitmapFactory.decodeStream(ctx.assets.open("city/$n.png"), null, o)!!.asImageBitmap()
+            fun img(n: String): ImageBitmap = try {
+                ctx.assets.open("city/$n.png").use { BitmapFactory.decodeStream(it, null, o)!!.asImageBitmap() }
+            } catch (e: Exception) {
+                android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+            }
             return CitySprites(
                 List(12) { img("b$it") }, List(2) { img("t$it") }, img("lamp"),
                 List(3) { img("sign$it") }, List(9) { img("car${it + 1}") }, List(12) { img("w$it") },

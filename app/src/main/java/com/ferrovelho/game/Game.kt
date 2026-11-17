@@ -9,6 +9,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -277,7 +278,9 @@ class GameState(context: Context) {
             3 -> { lo = 0; hi = 40000; n = 4 }
             else -> { lo = 40000; hi = 130000; n = 4 }
         }
+        val mid = if (hi == Int.MAX_VALUE) lo else (lo + hi) / 2
         val pool = CATALOG.indices.filter { CATALOG[it].base in lo..hi }
+            .ifEmpty { CATALOG.indices.sortedBy { abs(CATALOG[it].base - mid) }.take(6) }
         List(n) {
             val mi = pool[rnd.nextInt(pool.size)]
             val m = CATALOG[mi]

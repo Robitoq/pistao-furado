@@ -42,7 +42,7 @@ fun CarArt(
     val img = spr.cars[ci]
     val driver = remember { loadProfile(ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE))?.look }
     val paint = Color(PAINTS[colorIdx.coerceIn(0, PAINTS.lastIndex)].second)
-    val geo = remember(img) {
+    val geo = remember(img) { try {
         val b = img.asAndroidBitmap()
         fun first(x: Int): Int {
             for (y in 0 until b.height) if (android.graphics.Color.alpha(b.getPixel(x.coerceIn(0, b.width - 1), y)) > 0) return y
@@ -51,7 +51,7 @@ fun CarArt(
         var top = b.height
         for (x in 0 until b.width step 2) top = minOf(top, first(x))
         intArrayOf(top, first((b.width * 0.07f).toInt()))
-    }
+    } catch (e: Throwable) { intArrayOf(2, 4) } }
     val anim = rememberInfiniteTransition(label = "smoke")
     val t by anim.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart), label = "t")
     val k = 1.3f
@@ -62,6 +62,7 @@ fun CarArt(
         0f, 0f, 0f, 1f, 0f,
     ))
     Canvas(modifier) {
+      try {
         val w = img.width.toFloat()
         val h = img.height.toFloat()
         val s = min(size.width / (w + 8f), size.height / (h + 10f)).coerceAtLeast(1f)
@@ -120,5 +121,6 @@ fun CarArt(
                 drawCircle(Color(0x66AAAAAA).copy(alpha = 0.5f * (1f - p)), (2f + p * 3f) * s, Offset(ox + (w - 6f) * s, oy + (6f - p * 12f) * s))
             }
         }
+      } catch (e: Throwable) { }
     }
 }
