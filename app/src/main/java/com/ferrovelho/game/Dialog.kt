@@ -34,11 +34,11 @@ import kotlin.random.Random
 
 class BuyerLook(val female: Boolean, val skin: Color, val hair: Color, val shirt: Color, val pants: Color)
 
-private val MAN = listOf(
+internal val MAN = listOf(
     "..hhhh..", ".hhhhhh.", ".hssssh.", ".sesses.", ".ssssss.", "..ssss..", ".cccccc.",
     "sccccccs", "sccccccs", "sccccccs", ".pppppp.", ".pp..pp.", ".pp..pp.", ".oo..oo.",
 )
-private val WOMAN = listOf(
+internal val WOMAN = listOf(
     "..hhhh..", ".hhhhhh.", "hhsssshh", "hsessesh", "hssssssh", "h.ssss.h", "hcccccch",
     "sccccccs", ".cccccc.", "..cccc..", ".pppppp.", ".pppppp.", ".ss..ss.", ".oo..oo.",
 )

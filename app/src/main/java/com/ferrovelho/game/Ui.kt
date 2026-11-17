@@ -77,7 +77,7 @@ fun FerroVelhoApp(g: GameState) {
         topBar = { TopStatus(g) },
         bottomBar = {
             NavigationBar {
-                val tabs = listOf("🚗" to "Ferro Velho", "🔧" to "Garagem", "📊" to "Resumo")
+                val tabs = listOf("🚗" to "Ferro Velho", "🔧" to "Garagem", "📊" to "Resumo", "🏙️" to "Cidade")
                 tabs.forEachIndexed { i, t ->
                     NavigationBarItem(
                         selected = tab == i,
@@ -101,6 +101,7 @@ fun FerroVelhoApp(g: GameState) {
                         GarageScreen(g) { openCarId = it }
                     }
                 }
+                3 -> CityScreen(g)
                 else -> SummaryScreen(g) { askReset = true }
             }
         }
