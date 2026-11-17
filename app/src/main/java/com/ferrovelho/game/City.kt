@@ -84,6 +84,7 @@ private fun carSpriteFor(b: Body): Int = when (b) {
     Body.BOXY -> 0; Body.COMPACT -> 1; Body.WAGON -> 2; Body.MPV -> 4; Body.HATCH -> 1
     Body.SEDAN -> 5; Body.SUV -> 6; Body.PICKUP -> 8; Body.COUPE -> 3; Body.CLASSIC -> 7
     Body.VAN -> 4; Body.BEETLE -> 1; Body.SUPER -> 3
+    else -> 5
 }
 
 // item da cidade: tipo (0 prédio, 1 árvore, 2 poste, 3 placa), índice do sprite, x
