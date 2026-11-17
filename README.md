@@ -45,3 +45,9 @@ O carro agora é **desenhado no código** (`CarArt.kt`), não é mais uma imagem
 - **Lataria** → ferrugem, tinta descascada, massa/primer, amassados, porta de outra cor, farol quebrado, para-choque pendurado, vidro trincado.
 - **Motor** → fumaça cinza/preta e faíscas. **Pneus** → careca, calota enferrujada, furado. **Interior** → banco rasgado. **Suspensão** → traseira arriada.
 - **Tuning** → rebaixada (`Wear.LOWER`), rodas, neon, película, adesivo, escape, turbo, som, couro, aerofólio, para-choque.
+
+## Cidade (ajustada)
+
+- **Bugs de camada corrigidos**: janelas acesas, estrelas e letreiros não aparecem mais por cima de pessoas, carros e balões de fala. Balões não saem da tela nem se empilham.
+- **Menos cara de IA**: prédios do fundo irregulares (antena, caixa d'água, janelas acesas variadas), calçada com juntas e rachaduras diferentes, bueiros, remendos de asfalto, poças, faixa gasta, fios com passarinho, lixeiras, sacos de lixo, gatos e vasos de planta, postes em espaçamento irregular.
+- **Falas mais naturais** (`IDLE_LINES` e `PED_LINES` em `City.kt`).
