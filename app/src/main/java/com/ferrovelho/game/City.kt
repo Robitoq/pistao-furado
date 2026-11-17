@@ -69,6 +69,8 @@ class CitySprites(
     val sign: List<ImageBitmap>, val cars: List<ImageBitmap>,
 ) {
     companion object {
+        private var cache: CitySprites? = null
+        fun get(ctx: Context): CitySprites = cache ?: load(ctx).also { cache = it }
         fun load(ctx: Context): CitySprites {
             val o = BitmapFactory.Options().apply { inScaled = false }
             fun img(n: String) = BitmapFactory.decodeStream(ctx.assets.open("city/$n.png"), null, o)!!.asImageBitmap()
@@ -80,7 +82,7 @@ class CitySprites(
     }
 }
 
-private fun carSpriteFor(b: Body): Int = when (b) {
+fun carSpriteFor(b: Body): Int = when (b) {
     Body.BOXY -> 0; Body.COMPACT -> 1; Body.WAGON -> 2; Body.MPV -> 4; Body.HATCH -> 1
     Body.SEDAN -> 5; Body.SUV -> 6; Body.PICKUP -> 8; Body.COUPE -> 3; Body.CLASSIC -> 7
     Body.VAN -> 4; Body.BEETLE -> 1; Body.SUPER -> 3
@@ -194,7 +196,7 @@ fun CityScreen(g: GameState) {
     if (p == null) {
         CharacterCreator { profile = it; saveProfile(prefs, it) }
     } else {
-        val spr = remember { CitySprites.load(ctx) }
+        val spr = remember { CitySprites.get(ctx) }
         CityWorld(g, p, spr, prefs) { profile = null }
     }
 }
