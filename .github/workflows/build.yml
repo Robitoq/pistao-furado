@@ -17,7 +17,7 @@ jobs:
         run: |
           G=app/src/main/java/com/ferrovelho/game
           mkdir -p "$G"
-          for f in CarArt Cars Dialog Game Ui MainActivity; do
+          for f in CarArt Cars Dialog Game Ui MainActivity City; do
             if [ -f "$f.kt" ]; then cp "$f.kt" "$G/$f.kt"; fi
           done
           for f in "build.gradle.kts" "build.gradle (1).kts"; do
