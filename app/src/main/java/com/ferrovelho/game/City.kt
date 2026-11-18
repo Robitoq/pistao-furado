@@ -43,7 +43,7 @@ import kotlin.random.Random
 
 // ------------------------------------------------------------ mundo
 
-private const val WORLD = 5000f
+private const val WORLD = WORLD_END
 const val VIEW_W = 190f
 private val YARD_X = listOf(520f, 1450f, 2450f, 3500f, 4450f)
 private const val HOME_X = 260f     // casa do personagem
@@ -140,7 +140,7 @@ private fun genCity(spr: CitySprites): List<Item> {
     val r = Random(11)
     val out = ArrayList<Item>()
     var x = 20f
-    while (x < WORLD - 100f) {
+    while (x < CITY_END - 100f) {
         val yx = PLACE_X.firstOrNull { x + 80f > it - 110f && x < it + 110f }
         if (yx != null) { x = yx + 110f; continue }
         if (r.nextInt(100) < 18) {
@@ -156,12 +156,12 @@ private fun genCity(spr: CitySprites): List<Item> {
     var lx = 60f
     while (lx < WORLD) { out.add(Item(2, 0, lx)); lx += 95f + r.nextInt(55) }
     var k = 0
-    while (350f + 700f * k < WORLD) { out.add(Item(4, 0, 350f + 700f * k)); k++ }
+    while (350f + 700f * k < CITY_END) { out.add(Item(4, 0, 350f + 700f * k)); k++ }
     k = 0
     while (200f + 430f * k < WORLD) { out.add(Item(5, 0, 200f + 430f * k)); k++ }
     // lixeira, saco de lixo, gato e vaso espalhados pela calçada
     var pxx = 90f
-    while (pxx < WORLD - 60f) {
+    while (pxx < CITY_END - 60f) {
         pxx += 55f + r.nextInt(110)
         if (PLACE_X.any { abs(pxx - it) < 100f }) continue
         out.add(Item(6 + r.nextInt(4), r.nextInt(2), pxx))
@@ -524,10 +524,10 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     val city = remember(spr) { genCity(spr) }
     val lamps = remember(city) { city.filter { it.kind == 2 }.map { it.x } }
     val peds = remember {
-        List(22) { val r = Random(it + 5); Ped(randomLook(r), r.nextFloat() * WORLD, r.nextFloat() * 6f) }
+        List(34) { val r = Random(it + 5); Ped(randomLook(r), r.nextFloat() * WORLD, r.nextFloat() * 6f) }
     }
     val traffic = remember {
-        List(14) {
+        List(22) {
             val r = Random(it + 40)
             val lane = it % 2
             Traffic(r.nextInt(9), r.nextFloat() * WORLD, (25 + r.nextInt(25)) * (if (lane == 0) 1f else -1f), lane, randomLook(r))
@@ -555,6 +555,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var summaryDlg by remember { mutableStateOf(false) }
     var bizDlg by remember { mutableStateOf<Int?>(null) }
     var driveId by remember { mutableStateOf<Int?>(null) }
+    var zoneDlg by remember { mutableStateOf<Int?>(null) }
     var lojaDlg by remember { mutableStateOf<Int?>(null) }
     var driveDlg by remember { mutableStateOf(false) }
     var dragDlg by remember { mutableStateOf(false) }
@@ -576,6 +577,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     val nearGarage by remember { derivedStateOf { abs(px - GARAGE_X) < 60f } }
     val nearStore by remember { derivedStateOf { STORE_X.indexOfFirst { abs(px - it) < 40f } } }
     val nearLoja by remember { derivedStateOf { LOJA_X.indexOfFirst { abs(px - it) < 60f } } }
+    val nearZone by remember { derivedStateOf { if (abs(px - PARK_X) < 60f) 0 else if (abs(px - BEACH_X) < 60f) 1 else -1 } }
     val nearDrag by remember { derivedStateOf { abs(px - DRAG_X) < 70f } }
     val nearBiz by remember { derivedStateOf { COMPANY_X.indexOfFirst { abs(px - it) < 60f } } }
     val nearPed by remember {
@@ -583,7 +585,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || bizDlg != null || shopDlg != null || chatPed != null
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || bizDlg != null || shopDlg != null || chatPed != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -797,6 +799,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     }
                 }
 
+                drawZones(cam, s, t, night, ((oy - 12f * s) / skyH), paint)
                 // cidade
                 for (ci in city) {
                     if (ci.x > cam + VIEW_W + 20f || ci.x < cam - 110f) continue
@@ -970,6 +973,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     drawStoresLit(storesOpen, cam, s, night, paint)
                     drawCompaniesLit(g, cam, s, night, paint)
                     drawLojasLit(g, cam, s, night, paint)
+                    drawZonesLit(cam, s, night)
                 }
             }
 
@@ -1106,6 +1110,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     Button(onClick = { homeDlg = true }) { Text("🏠 Entrar em casa", fontSize = 13.sp) }
                 } else if (nearGarage) {
                     Button(onClick = { garageDlg = true }) { Text(if (g.ownShop) "🏢 ${g.motorsName()}" else "🔧 Entrar na oficina", fontSize = 13.sp) }
+                } else if (nearZone >= 0) {
+                    Button(onClick = { zoneDlg = nearZone }) { Text(if (nearZone == 0) "🌳 Parque Central" else "🏖️ Quiosque da Praia", fontSize = 13.sp) }
                 } else if (nearDrag) {
                     Button(onClick = { dragDlg = true }) { Text("🏁 Pista de Arrancada", fontSize = 13.sp) }
                 } else if (nearLoja >= 0) {
@@ -1147,6 +1153,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     if (summaryDlg) SummaryDialog(g) { summaryDlg = false }
     if (driveDlg) CarPickDialog(g, onPick = { driveId = it; driveDlg = false }, onClose = { driveDlg = false })
     if (dragDlg) DragDialog(g) { dragDlg = false }
+    zoneDlg?.let { zi -> ZoneDialog(g, zi) { zoneDlg = null } }
     lojaDlg?.let { li -> LojaDialog(g, li) { lojaDlg = null } }
     bizDlg?.let { bi -> CompanyDialog(g, bi) { bizDlg = null } }
     shopDlg?.let { si -> StoreDialog(g, STORES[si]) { shopDlg = null } }
@@ -1179,7 +1186,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     if (taxi) {
         Dialog(onDismissRequest = { taxi = false }) {
             Card {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("🚕 Táxi - pra onde?", fontWeight = FontWeight.Bold)
                     YARD_X.forEachIndexed { i, yx ->
                         val dist = abs(px - yx)
@@ -1295,6 +1302,40 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         },
                         Modifier.fillMaxWidth(),
                     ) { Text("🏁 Pista de Arrancada - ${brl(fareD)}", fontSize = 13.sp) }
+                    val distP = abs(px - PARK_X)
+                    OutlinedButton(
+                        onClick = {
+                            val fareP = taxiFare(distP)
+                            if (g.money < fareP) {
+                                g.message = "Sem dinheiro pro táxi."
+                            } else {
+                                g.money -= fareP
+                                g.spendTime(taxiMinutes(distP))
+                                px = PARK_X - 75f
+                                prefs.edit().putFloat("x", px).apply()
+                                g.save()
+                            }
+                            taxi = false
+                        },
+                        Modifier.fillMaxWidth(),
+                    ) { Text("🌳 Parque Central - ${brl(taxiFare(distP))}", fontSize = 13.sp) }
+                    val distB = abs(px - BEACH_X)
+                    OutlinedButton(
+                        onClick = {
+                            val fareB = taxiFare(distB)
+                            if (g.money < fareB) {
+                                g.message = "Sem dinheiro pro táxi."
+                            } else {
+                                g.money -= fareB
+                                g.spendTime(taxiMinutes(distB))
+                                px = BEACH_X - 75f
+                                prefs.edit().putFloat("x", px).apply()
+                                g.save()
+                            }
+                            taxi = false
+                        },
+                        Modifier.fillMaxWidth(),
+                    ) { Text("🏖️ Praia - ${brl(taxiFare(distB))}", fontSize = 13.sp) }
                     val fareH = taxiFare(abs(px - HOME_X))
                     OutlinedButton(
                         onClick = { taxi = false; rideHome() },
