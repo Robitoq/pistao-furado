@@ -554,6 +554,13 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var garageListDlg by remember { mutableStateOf(false) }
     var summaryDlg by remember { mutableStateOf(false) }
     var bizDlg by remember { mutableStateOf<Int?>(null) }
+    var driveId by remember { mutableStateOf<Int?>(null) }
+    var driveDlg by remember { mutableStateOf(false) }
+    var dragDlg by remember { mutableStateOf(false) }
+    var vel by remember { mutableFloatStateOf(0f) }
+    var odo by remember { mutableFloatStateOf(0f) }
+    val engine = remember { EngineSound() }
+    DisposableEffect(Unit) { onDispose { engine.release() } }
     var shopDlg by remember { mutableStateOf<Int?>(null) }
     var chatPed by remember { mutableStateOf<Int?>(null) }
     var sayHungry by remember { mutableStateOf(false) }
@@ -573,7 +580,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || garageListDlg || summaryDlg || bizDlg != null || shopDlg != null || chatPed != null
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || driveDlg || dragDlg || garageListDlg || summaryDlg || bizDlg != null || shopDlg != null || chatPed != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -637,9 +644,32 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     if (nf < 0.2f) saidNight = false
                     // madrugada: o personagem apaga de sono e oferece o táxi pra casa
                     if (g.minutes >= 23 * 60 + 20 && lateDay != g.day && !isBusy()) { lateDay = g.day; lateAsk = true }
-                    if (dir != 0 && !isBusy()) {
-                        px = (px + dir * (if (run) 135f else 75f) * (if (g.starving) 0.55f else 1f) * dt).coerceIn(20f, WORLD - 20f)
-                        face = dir
+                    val dc = g.garage.firstOrNull { it.id == driveId }
+                    if (dc != null) {
+                        val maxV = carStreetSpeed(dc)
+                        val busy = isBusy()
+                        val go = dir != 0 && !busy
+                        val tgt = if (go) dir * maxV else 0f
+                        vel += (tgt - vel) * minOf(1f, 2.2f * dt)
+                        if (busy) vel = 0f
+                        if (abs(vel) > 2f) {
+                            px = (px + vel * dt).coerceIn(20f, WORLD - 20f)
+                            face = if (vel > 0f) 1 else -1
+                            odo += abs(vel) * dt
+                        }
+                        if (Music.enabled && !busy) {
+                            engine.start()
+                            engine.set(38f + (abs(vel) / maxV).coerceIn(0f, 1f) * 130f, if (go) 0.8f else 0.35f)
+                        } else {
+                            engine.stop()
+                        }
+                    } else {
+                        if (vel != 0f) vel = 0f
+                        engine.stop()
+                        if (dir != 0 && !isBusy()) {
+                            px = (px + dir * (if (run) 135f else 75f) * (if (g.starving) 0.55f else 1f) * dt).coerceIn(20f, WORLD - 20f)
+                            face = dir
+                        }
                     }
                 }
                 last = n
@@ -955,8 +985,16 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         drawChar(mc.look, (ox - 6f - cam) * s, (114f - 26f) * s, s, i % 2 == 1, 0f, t * 2f + i)
                     }
                 }
-                drawChar(look, (px - 6f - cam) * s, (115f - 26f) * s, s, face < 0, if (moving) 1f else 0f,
-                    t * (if (run) 16f else 10f))
+                val dcar = g.garage.firstOrNull { it.id == driveId }
+                if (dcar != null) {
+                    val csi = carSpriteFor(CATALOG[dcar.model].body)
+                    val cimg = spr.cars[csi]
+                    val ctint = Color(PAINTS[dcar.color].second).copy(alpha = 0.35f)
+                    sp(cimg, px - cimg.width * 0.95f / 2f, 114f, cam, s, 0.95f, face < 0, ctint, 1f, csi, odo / 4.5f, look)
+                } else {
+                    drawChar(look, (px - 6f - cam) * s, (115f - 26f) * s, s, face < 0, if (moving) 1f else 0f,
+                        t * (if (run) 16f else 10f))
+                }
                 for (c in traffic) {
                     val x = (((c.x0 + t * c.speed) % WORLD) + WORLD) % WORLD
                     if (x < cam - 90f || x > cam + VIEW_W + 10f) continue
@@ -1069,7 +1107,11 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 } else if (nearPed >= 0) {
                     Button(onClick = { chatPed = nearPed }) { Text("💬 Conversar com ${pedName(nearPed)}", fontSize = 13.sp) }
                 } else {
-                    Text("Explore a cidade", fontSize = 12.sp)
+                    Text(if (driveId != null) "🚘 ${(abs(vel) * 0.5f).toInt()} km/h" else "Explore a cidade", fontSize = 12.sp)
+                }
+                Row {
+                    TextButton(onClick = { if (driveId != null) driveId = null else driveDlg = true }, contentPadding = PaddingValues(6.dp)) { Text(if (driveId != null) "🚶 Descer" else "🚘 Dirigir", fontSize = 12.sp) }
+                    TextButton(onClick = { dragDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("🏁 Arrancada", fontSize = 12.sp) }
                 }
                 Row {
                     TextButton(onClick = { garageListDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("🚗 Garagem", fontSize = 12.sp) }
@@ -1092,6 +1134,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     if (garageDlg) WorkshopDialog(g) { garageDlg = false }
     if (garageListDlg) GarageDialog(g) { garageListDlg = false }
     if (summaryDlg) SummaryDialog(g) { summaryDlg = false }
+    if (driveDlg) CarPickDialog(g, onPick = { driveId = it; driveDlg = false }, onClose = { driveDlg = false })
+    if (dragDlg) DragDialog(g) { dragDlg = false }
     bizDlg?.let { bi -> CompanyDialog(g, bi) { bizDlg = null } }
     shopDlg?.let { si -> StoreDialog(g, STORES[si]) { shopDlg = null } }
     chatPed?.let { pi -> StreetChat(g, peds[pi].look, pedName(pi), me.name) { chatPed = null } }
@@ -1179,6 +1223,27 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         },
                         Modifier.fillMaxWidth(),
                     ) { Text("🔧 Oficina - ${brl(fareG)}", fontSize = 13.sp) }
+                    COMPANY_X.forEachIndexed { ci, cxx ->
+                        if (ci in g.companies) {
+                            val distC = abs(px - cxx)
+                            val fareC = taxiFare(distC)
+                            OutlinedButton(
+                                onClick = {
+                                    if (g.money < fareC) {
+                                        g.message = "Sem dinheiro pro táxi."
+                                    } else {
+                                        g.money -= fareC
+                                        g.spendTime(taxiMinutes(distC))
+                                        px = cxx - 75f
+                                        prefs.edit().putFloat("x", px).apply()
+                                        g.save()
+                                    }
+                                    taxi = false
+                                },
+                                Modifier.fillMaxWidth(),
+                            ) { Text("${COMPANY_ICONS[ci]} ${COMPANY_NAMES[ci]} - ${brl(fareC)}", fontSize = 13.sp) }
+                        }
+                    }
                     val fareH = taxiFare(abs(px - HOME_X))
                     OutlinedButton(
                         onClick = { taxi = false; rideHome() },
