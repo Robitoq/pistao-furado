@@ -17,6 +17,7 @@ import kotlin.random.Random
 
 const val START_MONEY = 15000
 const val MAX_COND = 100
+const val SHOP_COST = 100_000   // montar a empresa própria (Ferrovelho Motors)
 
 val PART_NAMES = listOf("Motor", "Lataria", "Pneus", "Interior", "Suspensão")
 val PART_WEIGHT = listOf(0.30, 0.25, 0.10, 0.15, 0.20)
@@ -170,6 +171,13 @@ class GameState(context: Context) {
     var meetDay by mutableStateOf(0)    // último dia em que participou do encontro de carros
     var meetWins by mutableStateOf(0)   // quantas vezes ficou em 1º lugar
     var meetBest by mutableStateOf(0)   // melhor colocação (0 = nunca participou)
+    var hunger by mutableStateOf(85.0)  // 100 = satisfeito, 0 = morrendo de fome
+    var thirst by mutableStateOf(85.0)  // 100 = hidratado, 0 = morrendo de sede
+    var ownShop by mutableStateOf(false) // empresa própria: oficina com desconto e aberta 24h
+
+    /** Desconto da empresa própria em reparos, tuning e pintura. */
+    val shopDisc: Double get() = if (ownShop) 0.70 else 1.0
+    val starving: Boolean get() = hunger < 15.0 || thirst < 15.0
 
     private var nextId = 1
     private var seed = Random.nextInt()
@@ -188,7 +196,11 @@ class GameState(context: Context) {
             SimpleDateFormat("EEE, dd/MM/yyyy", PT_BR).format(cal().time) +
             " • " + String.format(PT_BR, "%02d:%02d", minutes / 60, minutes % 60)
 
-    private fun tick(min: Int) { minutes = (minutes + min).coerceAtMost(23 * 60 + 59) }
+    private fun tick(min: Int) {
+        minutes = (minutes + min).coerceAtMost(23 * 60 + 59)
+        hunger = (hunger - min * 0.08).coerceAtLeast(0.0)
+        thirst = (thirst - min * 0.11).coerceAtLeast(0.0)
+    }
 
     fun spendTime(min: Int) = tick(min)
 
@@ -251,6 +263,9 @@ class GameState(context: Context) {
         meetDay = 0
         meetWins = 0
         meetBest = 0
+        hunger = 85.0
+        thirst = 85.0
+        ownShop = false
         nextId = 1
         seed = Random.nextInt()
         yards = genYards(Random(System.nanoTime()))
@@ -263,7 +278,15 @@ class GameState(context: Context) {
         minutes = 8 * 60
         val news = stepMarket()
         yards = genYards(Random(System.nanoTime()))
+        // durante a noite o personagem fica sem comer: acorda com fome, mas não morrendo
+        hunger = (hunger - 25.0).coerceAtLeast(25.0.coerceAtMost(hunger))
+        thirst = (thirst - 20.0).coerceAtLeast(25.0.coerceAtMost(thirst))
         var msg = "Dia $day: chegaram carros novos nos ferros-velhos."
+        if (ownShop) {
+            val inc = Random.nextInt(300, 900)
+            money += inc
+            msg += " 🔧 A Ferrovelho Motors rendeu ${brl(inc)} de serviços."
+        }
         if (news.isNotEmpty()) msg += " 📰 $news"
         if (garage.isEmpty() && money < 5000) {
             money = 5000
@@ -332,7 +355,7 @@ class GameState(context: Context) {
 
     fun repairCost(car: OwnedCar, part: Int, to: Int): Int {
         val pts = max(0, to.coerceAtMost(MAX_COND) - car.cond[part])
-        return (pts * baseValue(car.model, car.year) * PART_COST[part]).roundToInt()
+        return (pts * baseValue(car.model, car.year) * PART_COST[part] * shopDisc).roundToInt()
     }
 
     fun repair(carId: Int, part: Int, to: Int) {
@@ -351,6 +374,47 @@ class GameState(context: Context) {
         save()
     }
 
+    /** Custo das peças de UMA tentativa do minigame (metade do preço de +10 pontos). */
+    fun mechanicCost(car: OwnedCar, part: Int): Int =
+        (repairCost(car, part, car.cond[part] + 10) * 0.5).roundToInt().coerceAtLeast(20)
+
+    /** Resultado de uma tentativa do minigame: cobra as peças e aplica os pontos ganhos (0 se errou). */
+    fun mechanicTry(carId: Int, part: Int, pts: Int): Boolean {
+        val car = garage.firstOrNull { it.id == carId } ?: return false
+        if (car.cond[part] >= MAX_COND) return false
+        val cost = mechanicCost(car, part)
+        if (cost > money) { message = "Sem dinheiro pras peças (${brl(cost)})."; return false }
+        money -= cost
+        tick(20)
+        update(carId) {
+            val l = it.cond.toMutableList()
+            l[part] = (l[part] + pts).coerceAtMost(MAX_COND)
+            it.copy(cond = l, spent = it.spent + cost)
+        }
+        save()
+        return true
+    }
+
+    fun buildShop() {
+        if (ownShop) return
+        if (money < SHOP_COST) { message = "Montar a empresa custa ${brl(SHOP_COST)}."; return }
+        money -= SHOP_COST
+        ownShop = true
+        message = "🎉 A Ferrovelho Motors é sua! Peças 30% mais baratas e oficina aberta 24h."
+        save()
+    }
+
+    /** Compra comida/bebida. Retorna true se deu certo. */
+    fun eat(f: Food): Boolean {
+        if (f.price > money) { message = "Sem dinheiro pra ${f.name} (${brl(f.price)})."; return false }
+        money -= f.price
+        tick(f.minutes)
+        hunger = (hunger + f.hunger).coerceAtMost(100.0)
+        thirst = (thirst + f.thirst).coerceAtMost(100.0)
+        save()
+        return true
+    }
+
     fun repairAllCost(car: OwnedCar): Int = PART_NAMES.indices.sumOf { repairCost(car, it, MAX_COND) }
 
     fun repairAll(carId: Int) {
@@ -366,7 +430,7 @@ class GameState(context: Context) {
     }
 
     fun tuningPrice(car: OwnedCar, t: Tuning): Int =
-        roundTo50(max(t.minPrice.toDouble(), baseValue(car.model, car.year) * t.pricePct))
+        roundTo50(max(t.minPrice.toDouble(), baseValue(car.model, car.year) * t.pricePct) * shopDisc)
 
     fun install(carId: Int, t: Tuning) {
         val car = garage.firstOrNull { it.id == carId } ?: return
@@ -380,7 +444,7 @@ class GameState(context: Context) {
         save()
     }
 
-    fun paintCost(car: OwnedCar): Int = roundTo50(max(1200.0, baseValue(car.model, car.year) * 0.025))
+    fun paintCost(car: OwnedCar): Int = roundTo50(max(1200.0, baseValue(car.model, car.year) * 0.025) * shopDisc)
 
     fun paint(carId: Int, colorIdx: Int) {
         val car = garage.firstOrNull { it.id == carId } ?: return
@@ -443,6 +507,9 @@ class GameState(context: Context) {
         o.put("meetDay", meetDay)
         o.put("meetWins", meetWins)
         o.put("meetBest", meetBest)
+        o.put("hunger", hunger)
+        o.put("thirst", thirst)
+        o.put("ownShop", ownShop)
         o.put("nextId", nextId)
         o.put("seed", seed)
         o.put("minutes", minutes)
@@ -482,6 +549,9 @@ class GameState(context: Context) {
             meetDay = o.optInt("meetDay", 0)
             meetWins = o.optInt("meetWins", 0)
             meetBest = o.optInt("meetBest", 0)
+            hunger = o.optDouble("hunger", 85.0)
+            thirst = o.optDouble("thirst", 85.0)
+            ownShop = o.optBoolean("ownShop", false)
             nextId = o.getInt("nextId")
             seed = o.getInt("seed")
             minutes = o.optInt("minutes", 8 * 60)

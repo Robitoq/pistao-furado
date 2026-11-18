@@ -44,11 +44,11 @@ import kotlin.random.Random
 // ------------------------------------------------------------ mundo
 
 private const val WORLD = 5000f
-private const val VIEW_W = 190f
+const val VIEW_W = 190f
 private val YARD_X = listOf(520f, 1450f, 2450f, 3500f, 4450f)
 private const val HOME_X = 260f     // casa do personagem
 private const val MEET_X = 2000f    // encontro de carros
-private val NEW_PLACES = listOf(HOME_X, MEET_X)
+private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X
 private val PLACE_X = YARD_X + NEW_PLACES
 
 val CSKIN = listOf(0xFFFFDBB4, 0xFFF1C27D, 0xFFE0AC69, 0xFFC68642, 0xFF8D5524, 0xFF6B4423, 0xFF4A2C17).map { Color(it) }
@@ -170,7 +170,7 @@ private fun genCity(spr: CitySprites): List<Item> {
 }
 
 /** Número "aleatório" estável a partir de um inteiro (pra variar o cenário sem piscar). */
-private fun hsh(a: Int): Int {
+fun hsh(a: Int): Int {
     var x = a * -1640531535
     x = x xor (x ushr 15)
     x *= 0x2c1b3c6d
@@ -178,7 +178,7 @@ private fun hsh(a: Int): Int {
     return x and 0x7fffffff
 }
 
-private fun nightF(m: Int): Float = when {
+fun nightF(m: Int): Float = when {
     m < 5 * 60 -> 1f
     m < 7 * 60 -> (7 * 60 - m) / 120f
     m < 18 * 60 -> 0f
@@ -188,7 +188,7 @@ private fun nightF(m: Int): Float = when {
 
 // ------------------------------------------------------------ desenho
 
-private fun DrawScope.wr(c: Color, x: Float, y: Float, w: Float, h: Float, cam: Float, s: Float) {
+fun DrawScope.wr(c: Color, x: Float, y: Float, w: Float, h: Float, cam: Float, s: Float) {
     drawRect(c, Offset((x - cam) * s, y * s), Size(w * s, h * s))
 }
 
@@ -324,7 +324,7 @@ fun DrawScope.drawChar(l: Look, left: Float, top: Float, c: Float, faceLeft: Boo
     }
 }
 
-private fun DrawScope.label(p: Paint, txt: String, wx: Float, y: Float, cam: Float, s: Float, sz: Float, col: Int) {
+fun DrawScope.label(p: Paint, txt: String, wx: Float, y: Float, cam: Float, s: Float, sz: Float, col: Int) {
     p.textSize = sz * s
     p.textAlign = Paint.Align.CENTER
     val nc = drawContext.canvas.nativeCanvas
@@ -548,6 +548,11 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var sleeping by remember { mutableStateOf(false) }
     var sleepTaxi by remember { mutableStateOf(false) }
     var lateAsk by remember { mutableStateOf(false) }
+    var garageDlg by remember { mutableStateOf(false) }
+    var shopDlg by remember { mutableStateOf<Int?>(null) }
+    var chatPed by remember { mutableStateOf<Int?>(null) }
+    var sayHungry by remember { mutableStateOf(false) }
+    var sayThirsty by remember { mutableStateOf(false) }
     var lateDay by remember { mutableIntStateOf(-1) }
     val meetField = remember(g.day) { genMeetField(g.day) }
     var say by remember { mutableStateOf<String?>("Bora achar uma pechincha!") }
@@ -555,9 +560,14 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     val near by remember { derivedStateOf { YARD_X.indexOfFirst { abs(px - it) < 30f } } }
     val nearMeet by remember { derivedStateOf { abs(px - MEET_X) < 70f } }
     val nearHome by remember { derivedStateOf { abs(px - HOME_X) < 55f } }
+    val nearGarage by remember { derivedStateOf { abs(px - GARAGE_X) < 60f } }
+    val nearStore by remember { derivedStateOf { STORE_X.indexOfFirst { abs(px - it) < 40f } } }
+    val nearPed by remember {
+        derivedStateOf { peds.indices.firstOrNull { abs(peds[it].base + sin(time * 0.4f + peds[it].phase) * 60f - px) < 20f } ?: -1 }
+    }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || shopDlg != null || chatPed != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -601,7 +611,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         lastNear = nn
                         if (nn >= 0) { say = "Olha o ${YARD_NAMES[nn]}!"; sayUntil = time + 3f }
                     }
-                    val pl = if (abs(px - MEET_X) < 60f) 1 else if (abs(px - HOME_X) < 55f) 2 else 0
+                    val pl = if (abs(px - MEET_X) < 60f) 1 else if (abs(px - HOME_X) < 55f) 2 else if (abs(px - GARAGE_X) < 70f) 3 else if (STORE_X.any { abs(px - it) < 50f }) 4 else 0
                     if (pl != lastPl) {
                         lastPl = pl
                         if (pl == 1) {
@@ -609,14 +619,20 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             sayUntil = time + 4f
                         }
                         if (pl == 2) { say = "Minha casinha."; sayUntil = time + 2.5f }
+                        if (pl == 3) { say = if (g.ownShop) "Minha empresa! Orgulho." else "Bora ver o que dá pra consertar!"; sayUntil = time + 3f }
+                        if (pl == 4) { say = "Que cheirinho bom..."; sayUntil = time + 2.5f }
                     }
+                    if (g.hunger < 30.0 && !sayHungry) { sayHungry = true; say = "Tô com fome... preciso comer algo."; sayUntil = time + 4f }
+                    if (g.hunger > 50.0) sayHungry = false
+                    if (g.thirst < 30.0 && !sayThirsty) { sayThirsty = true; say = "Que sede! Cadê uma água?"; sayUntil = time + 4f }
+                    if (g.thirst > 50.0) sayThirsty = false
                     val nf = nightF(g.minutes)
                     if (nf > 0.6f && !saidNight) { saidNight = true; say = "Já escureceu! Encontro de carros ou casa?"; sayUntil = time + 4f }
                     if (nf < 0.2f) saidNight = false
                     // madrugada: o personagem apaga de sono e oferece o táxi pra casa
                     if (g.minutes >= 23 * 60 + 20 && lateDay != g.day && !isBusy()) { lateDay = g.day; lateAsk = true }
                     if (dir != 0 && !isBusy()) {
-                        px = (px + dir * (if (run) 135f else 75f) * dt).coerceIn(20f, WORLD - 20f)
+                        px = (px + dir * (if (run) 135f else 75f) * (if (g.starving) 0.55f else 1f) * dt).coerceIn(20f, WORLD - 20f)
                         face = dir
                     }
                 }
@@ -626,6 +642,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
 
     Column(Modifier.fillMaxSize()) {
+        NeedsBar(g)
         Canvas(Modifier.fillMaxWidth().weight(1f)) {
             val s = size.width / VIEW_W
             val oy = size.height - 150f * s
@@ -635,6 +652,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
             val moving = dir != 0 && !isBusy()
             val skyH = oy + 104f * s
             val meetOn = g.minutes >= 17 * 60
+            val storesOpen = STORES.map { g.minutes in it.open until it.close }
 
             // prédios do fundo: larguras/alturas irregulares, antena, caixa d'água e janelas (algumas acesas)
             fun skyline() {
@@ -866,6 +884,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 }
                 drawHome(cam, s, t, night, paint)
                 drawMeetLot(cam, s, t, night, g.minutes >= MEET_START, paint)
+                drawGarageShop(g.ownShop, garageOpen(g), cam, s, t, paint)
+                drawStores(storesOpen, cam, s, t, paint)
             }
 
             // ---- escuridão da noite (só no mundo, o céu já tem a própria cor) e pôr do sol
@@ -903,6 +923,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     }
                     drawHomeLit(cam, s, night)
                     drawMeetLit(cam, s, t, night, g.minutes >= MEET_START, paint)
+                    drawGarageLit(g.ownShop, garageOpen(g), cam, s, night, paint)
+                    drawStoresLit(storesOpen, cam, s, night, paint)
                 }
             }
 
@@ -1028,6 +1050,12 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     Button(onClick = { meetDlg = true }) { Text("🏁 Encontro de carros", fontSize = 13.sp) }
                 } else if (nearHome) {
                     Button(onClick = { homeDlg = true }) { Text("🏠 Entrar em casa", fontSize = 13.sp) }
+                } else if (nearGarage) {
+                    Button(onClick = { garageDlg = true }) { Text(if (g.ownShop) "🏢 Ferrovelho Motors" else "🔧 Entrar na oficina", fontSize = 13.sp) }
+                } else if (nearStore >= 0) {
+                    Button(onClick = { shopDlg = nearStore }) { Text(STORES[nearStore].title.substringBefore(" ") + " Entrar", fontSize = 13.sp) }
+                } else if (nearPed >= 0) {
+                    Button(onClick = { chatPed = nearPed }) { Text("💬 Conversar com ${pedName(nearPed)}", fontSize = 13.sp) }
                 } else {
                     Text("Explore a cidade", fontSize = 12.sp)
                 }
@@ -1045,6 +1073,9 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
         YardTalk(g, yi, me.name, me.look.female, first, mask == 31, spr) { talk = null }
     }
     if (meetDlg) CarMeetDialog(g, me.name, me.look) { meetDlg = false }
+    if (garageDlg) WorkshopDialog(g) { garageDlg = false }
+    shopDlg?.let { si -> StoreDialog(g, STORES[si]) { shopDlg = null } }
+    chatPed?.let { pi -> StreetChat(g, peds[pi].look, pedName(pi), me.name) { chatPed = null } }
     if (homeDlg) {
         HomeDialog(g, onSleep = { homeDlg = false; sleepTaxi = false; sleeping = true }, onClose = { homeDlg = false })
     }
@@ -1112,6 +1143,23 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         },
                         Modifier.fillMaxWidth(),
                     ) { Text("🏁 Encontro de Carros - ${brl(fareM)}", fontSize = 13.sp) }
+                    val distG = abs(px - GARAGE_X)
+                    val fareG = taxiFare(distG)
+                    OutlinedButton(
+                        onClick = {
+                            if (g.money < fareG) {
+                                g.message = "Sem dinheiro pro táxi."
+                            } else {
+                                g.money -= fareG
+                                g.spendTime(taxiMinutes(distG))
+                                px = GARAGE_X - 75f
+                                prefs.edit().putFloat("x", px).apply()
+                                g.save()
+                            }
+                            taxi = false
+                        },
+                        Modifier.fillMaxWidth(),
+                    ) { Text("🔧 Oficina - ${brl(fareG)}", fontSize = 13.sp) }
                     val fareH = taxiFare(abs(px - HOME_X))
                     OutlinedButton(
                         onClick = { taxi = false; rideHome() },

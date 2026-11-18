@@ -113,7 +113,7 @@ fun FerroVelhoApp(g: GameState) {
                 1 -> {
                     val car = g.garage.firstOrNull { it.id == openCarId }
                     if (car != null) {
-                        CarScreen(g, car) { openCarId = null }
+                        CarScreen(g, car, onCity = { openCarId = null; tab = 3 }) { openCarId = null }
                     } else {
                         GarageScreen(g) { openCarId = it }
                     }
@@ -307,7 +307,7 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun CarScreen(g: GameState, car: OwnedCar, onBack: () -> Unit) {
+private fun CarScreen(g: GameState, car: OwnedCar, onCity: () -> Unit, onBack: () -> Unit) {
     val m = CATALOG[car.model]
     val invested = car.paid + car.spent
     var haggle by remember { mutableStateOf<Haggle?>(null) }
@@ -324,41 +324,12 @@ private fun CarScreen(g: GameState, car: OwnedCar, onBack: () -> Unit) {
             fontSize = 13.sp,
         )
 
-        SectionTitle("🔧 Reparos")
-        PART_NAMES.forEachIndexed { i, name -> RepairCard(g, car, i, name) }
-        if (g.repairAllCost(car) > 0) {
-            Button(
-                onClick = { g.repairAll(car.id) },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-            ) { Text("🛠️ Reparar tudo · ${brl(g.repairAllCost(car))}", fontWeight = FontWeight.Bold) }
-        }
-
-        SectionTitle("🎛️ Tuning")
-        TUNINGS.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { t -> TuningCard(g, car, t, Modifier.weight(1f)) }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
-            }
-        }
-
-        SectionTitle("🎨 Pintura (${brl(g.paintCost(car))})")
-        PAINTS.chunked(7).forEachIndexed { row, chunk ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                chunk.forEachIndexed { j, p ->
-                    val idx = row * 7 + j
-                    val selected = idx == car.color
-                    Spacer(
-                        Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(p.second))
-                            .border(if (selected) 3.dp else 1.dp, if (selected) Color.White else Color.Gray, CircleShape)
-                            .clickable { g.paint(car.id, idx) },
-                    )
-                }
-            }
-        }
+        SectionTitle("🔧 Oficina")
+        Text(
+            "Conserto, tuning e pintura agora são feitos na oficina, lá na cidade.",
+            fontSize = 13.sp,
+        )
+        Button(onClick = onCity, modifier = Modifier.fillMaxWidth()) { Text("🏙️ Ir até a oficina") }
 
         SectionTitle("💰 Vender")
         Button(
@@ -433,10 +404,10 @@ private fun MarketChart(h: List<Double>) {
 
 // ------------------------------------------------------------------ cards bonitos (reparo / tuning)
 
-private val PART_ICONS = listOf("⚙️", "🚪", "🛞", "💺", "🔩")
+val PART_ICONS = listOf("⚙️", "🚪", "🛞", "💺", "🔩")
 
 @Composable
-private fun RepairCard(g: GameState, car: OwnedCar, i: Int, name: String) {
+fun RepairCard(g: GameState, car: OwnedCar, i: Int, name: String) {
     val v = car.cond[i]
     val (label, col) = when {
         v < 25 -> "Péssimo" to RED
@@ -492,7 +463,7 @@ private fun RepairCard(g: GameState, car: OwnedCar, i: Int, name: String) {
 }
 
 @Composable
-private fun TuningCard(g: GameState, car: OwnedCar, t: Tuning, modifier: Modifier) {
+fun TuningCard(g: GameState, car: OwnedCar, t: Tuning, modifier: Modifier) {
     val has = t.id in car.tuning
     val accent = if (has) GREEN else Color(0xFFB39DDB)
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
