@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -139,6 +140,7 @@ private val GEAR_V = floatArrayOf(0.28f, 0.45f, 0.65f, 0.84f, 1.0f)   // velocid
 private val GEAR_A = floatArrayOf(1.0f, 0.8f, 0.62f, 0.5f, 0.42f)     // força de cada marcha
 private const val TRACK = 402f                                         // 1/4 de milha
 private val BETS = listOf(0, 1000, 5000, 20000)
+private val CROWD = listOf(Color(0xFFE53935), Color(0xFFFDD835), Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFEC407A))
 
 @Composable
 private fun Pick(selected: Boolean, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
@@ -157,33 +159,125 @@ private fun BarFill(frac: Float, color: Color) {
 }
 
 @Composable
-private fun Speedo(kmh: Float, gear: Int) {
-    Box(Modifier.size(170.dp), contentAlignment = Alignment.Center) {
+private fun Speedo(kmh: Float, gear: Int, dim: androidx.compose.ui.unit.Dp) {
+    Box(Modifier.size(dim), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val r = this.size.minDimension / 2f
             val c = Offset(this.size.width / 2f, this.size.height / 2f)
             val tl = Offset(c.x - r * 0.88f, c.y - r * 0.88f)
             val sz = Size(r * 1.76f, r * 1.76f)
             val frac = (kmh / 320f).coerceIn(0f, 1f)
-            drawArc(Color(0xFF37474F), 135f, 270f, false, topLeft = tl, size = sz, style = Stroke(width = 16f))
-            drawArc(if (frac > 0.8f) Color(0xFFEF5350) else Color(0xFF66BB6A), 135f, 270f * frac, false, topLeft = tl, size = sz, style = Stroke(width = 16f))
+            drawArc(Color(0xFF37474F), 135f, 270f, false, topLeft = tl, size = sz, style = Stroke(width = 14f))
+            drawArc(if (frac > 0.8f) Color(0xFFEF5350) else Color(0xFF66BB6A), 135f, 270f * frac, false, topLeft = tl, size = sz, style = Stroke(width = 14f))
             val ang = (135f + 270f * frac) * PI / 180.0
             drawLine(
                 Color.White, c,
                 Offset(c.x + (r * 0.72f * cos(ang)).toFloat(), c.y + (r * 0.72f * sin(ang)).toFloat()),
-                strokeWidth = 6f,
+                strokeWidth = 5f,
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(54.dp))
-            Text("${kmh.toInt()}", fontSize = 30.sp, fontWeight = FontWeight.Bold)
-            Text("km/h  •  ${gear + 1}ª", fontSize = 12.sp)
+            Spacer(Modifier.height(dim * 0.32f))
+            Text("${kmh.toInt()}", fontSize = (dim.value * 0.19f).sp, fontWeight = FontWeight.Bold)
+            Text("km/h • ${gear + 1}ª", fontSize = 11.sp)
         }
     }
 }
 
+/** A pista de arrancada vista de lado: você e mais dois carros disputando de verdade. */
 @Composable
-fun DragDialog(g: GameState, onClose: () -> Unit) {
+private fun RaceScene(
+    spr: CitySprites, car: OwnedCar?, t: Float, dist: Float, oppT: Float, opp2T: Float,
+    light: Int, racing: Boolean, boost: Float, gas: Boolean, speed: Float,
+) {
+    val rivalIdx = remember(oppT) { intArrayOf(hsh((oppT * 1000f).toInt()) % 9, hsh((oppT * 777f).toInt() + 5) % 9) }
+    val rivalCol = remember(oppT) { intArrayOf(hsh((oppT * 313f).toInt()) % PAINTS.size, hsh((oppT * 911f).toInt() + 3) % PAINTS.size) }
+    Canvas(Modifier.fillMaxWidth().height(170.dp)) {
+        val s = size.width / VIEW_W
+        val hW = size.height / s
+        val u = 6f            // unidades do mapa por metro
+        val startX = 70f
+        val pU = startX + min(dist, TRACK) * u
+        val r1 = startX + min(TRACK, TRACK * (t / oppT).pow(2)) * u
+        val r2 = startX + min(TRACK, TRACK * (t / opp2T).pow(2)) * u
+        val cam = max(0f, max(pU, max(r1, r2)) - 120f)
+        val gy = hW - 34f
+        // céu, colinas e árvores
+        drawRect(Brush.verticalGradient(listOf(Color(0xFF5DB4EA), Color(0xFFD6EEFA)), 0f, gy * s), Offset.Zero, Size(size.width, gy * s))
+        var k = (cam / 40f).toInt() - 1
+        while (k * 40f < cam + VIEW_W + 40f) {
+            val h = hsh(k * 31 + 5) % 16
+            wr(Color(0xFFA5D6A7), k * 40f, gy - 16f - h, 41f, 16f + h, cam, s)
+            k++
+        }
+        k = (cam / 70f).toInt() - 1
+        while (k * 70f < cam + VIEW_W + 70f) {
+            val x = k * 70f + (hsh(k * 17 + 9) % 30)
+            wr(Color(0xFF6D4C41), x, gy - 14f, 3f, 14f, cam, s)
+            drawCircle(Color(0xFF2E7D32), 9f * s, Offset((x + 1.5f - cam) * s, (gy - 18f) * s))
+            k++
+        }
+        // arquibancadas na largada e na chegada
+        val finX = startX + TRACK * u + 8f
+        for (gx in listOf(startX + 40f, finX - 150f)) {
+            wr(Color(0xFF78909C), gx, gy - 24f, 120f, 24f, cam, s)
+            wr(Color(0xFF546E7A), gx, gy - 4f, 120f, 4f, cam, s)
+            for (i in 0..15) wr(CROWD[(i * 3) % CROWD.size], gx + 4f + i * 7f, gy - 21f + (i % 3) * 6f, 3f, 4f, cam, s)
+        }
+        // asfalto, faixas, largada, marcadores e chegada
+        wr(Color(0xFF424B54), cam, gy, VIEW_W, 34f, cam, s)
+        wr(Color(0xFFFFFFFF), cam, gy + 0.5f, VIEW_W, 0.8f, cam, s)
+        wr(Color(0xFFFFFFFF), cam, hW - 1.2f, VIEW_W, 0.8f, cam, s)
+        var d = (cam / 24f).toInt() - 1
+        while (d * 24f < cam + VIEW_W + 24f) {
+            wr(Color(0xAAFFFFFF), d * 24f, gy + 11f, 12f, 0.9f, cam, s)
+            wr(Color(0xAAFFFFFF), d * 24f, gy + 22f, 12f, 0.9f, cam, s)
+            d++
+        }
+        wr(Color(0xFFFFFFFF), startX + 8f, gy, 2.4f, 34f, cam, s)
+        for (m in 1..3) {
+            val mx = startX + m * 100f * u + 8f
+            wr(Color(0xFF9E9E9E), mx + 2.5f, gy - 5f, 1f, 5f, cam, s)
+            wr(Color(0xFFFFEB3B), mx, gy - 10f, 6f, 5f, cam, s)
+        }
+        for (j in 0..7) wr(if (j % 2 == 0) Color(0xFFFFFFFF) else Color(0xFF212121), finX, gy + j * 4.25f, 3f, 4.25f, cam, s)
+        wr(Color(0xFF212121), finX - 1f, gy - 34f, 2f, 34f, cam, s)
+        wr(Color(0xFF212121), finX - 1f, gy - 34f, 14f, 2f, cam, s)
+        // semáforo da largada
+        wr(Color(0xFF37474F), 50f, gy - 34f, 3f, 34f, cam, s)
+        wr(Color(0xFF212121), 46f, gy - 40f, 11f, 22f, cam, s)
+        val lit = when (light) { 3 -> 1; 2 -> 2; 1 -> 3; else -> 0 }
+        for (i in 0..2) {
+            val col = if (light == 0) {
+                if (racing && t < 1.5f && i == 2) Color(0xFF43A047) else Color(0xFF3E2723)
+            } else if (i < lit) Color(0xFFE53935) else Color(0xFF3E2723)
+            drawCircle(col, 2.6f * s, Offset((51.5f - cam) * s, (gy - 35f + i * 6f) * s))
+        }
+        // carros: o mais ao fundo primeiro
+        fun drawCar(idx: Int, colIdx: Int, x: Float, by: Float, showFx: Boolean) {
+            val img = spr.cars[idx]
+            val w = img.width * 0.9f
+            val left = x - w + 6f
+            if (showFx) {
+                if (gas && speed < 25f) {
+                    for (q in 0..2) drawCircle(Color(0x88FFFFFF), (2f + q) * s, Offset((left + 2f - q * 5f - cam) * s, (by - 3f - q) * s))
+                }
+                if (boost > 0f) {
+                    wr(Color(0xFFFF9800), left - 9f, by - 8f, 9f, 3f, cam, s)
+                    wr(Color(0xFFFFEB3B), left - 5f, by - 7.4f, 5f, 1.8f, cam, s)
+                }
+            }
+            sp(img, left, by, cam, s, 0.9f, false, Color(PAINTS[colIdx].second).copy(alpha = 0.35f), 1f, idx, x / 4.5f, null)
+        }
+        drawCar(rivalIdx[1], rivalCol[1], r2, hW - 26f, false)
+        drawCar(rivalIdx[0], rivalCol[0], r1, hW - 17f, false)
+        val myIdx = if (car != null) carSpriteFor(CATALOG[car.model].body) else 0
+        drawCar(myIdx, car?.color ?: 0, pU, hW - 8f, true)
+    }
+}
+
+@Composable
+fun DragDialog(g: GameState, spr: CitySprites, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val engine = remember { EngineSound() }
     var stage by remember { mutableStateOf(DragStage.SETUP) }
@@ -199,6 +293,7 @@ fun DragDialog(g: GameState, onClose: () -> Unit) {
     var shiftMsg by remember { mutableStateOf("") }
     var light by remember { mutableIntStateOf(3) }
     var oppT by remember { mutableFloatStateOf(14f) }
+    var opp2T by remember { mutableFloatStateOf(15f) }
     var myT by remember { mutableFloatStateOf(0f) }
     var won by remember { mutableStateOf(false) }
     val car = g.garage.firstOrNull { it.id == carId }
@@ -233,6 +328,7 @@ fun DragDialog(g: GameState, onClose: () -> Unit) {
             else -> Random.nextDouble(1.1, 1.4)
         }
         oppT = (39.0 * (carPower(c) * mult).pow(-0.21) * Random.nextDouble(0.97, 1.05)).toFloat()
+        opp2T = oppT * Random.nextDouble(1.03, 1.15).toFloat()
         t = 0f; speed = 0f; dist = 0f; gear = 0; rpm = 0.2f; boost = 0f; shiftMsg = ""; gas = false
         light = 3
         stage = DragStage.LIGHTS
@@ -342,15 +438,18 @@ fun DragDialog(g: GameState, onClose: () -> Unit) {
                                 t < 1f -> "🟢 VAI!"
                                 else -> shiftMsg
                             },
-                            Modifier.fillMaxWidth(), textAlign = TextAlign.Center, fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                            Modifier.fillMaxWidth(), textAlign = TextAlign.Center, fontSize = 20.sp, fontWeight = FontWeight.Bold,
                         )
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Speedo(kmh, gear) }
-                        Text("Giro do motor", fontSize = 12.sp)
-                        BarFill(rpm, if (rpm in 0.85f..0.98f) Color(0xFF66BB6A) else if (rpm > 0.98f) Color(0xFFEF5350) else Color(0xFFFFCA28))
-                        Text("Você  •  ${dist.toInt()} m  •  ${"%.2f".format(t)} s", fontSize = 12.sp)
-                        BarFill(dist / TRACK, Color(0xFF42A5F5))
-                        Text("Rival  •  ${oppDist.toInt()} m", fontSize = 12.sp)
-                        BarFill(oppDist / TRACK, Color(0xFFEF5350))
+                        RaceScene(spr, car, t, dist, oppT, opp2T, light, stage == DragStage.RACE, boost, gas, speed)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Speedo(kmh, gear, 130.dp)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Giro do motor", fontSize = 12.sp)
+                                BarFill(rpm, if (rpm in 0.85f..0.98f) Color(0xFF66BB6A) else if (rpm > 0.98f) Color(0xFFEF5350) else Color(0xFFFFCA28))
+                                Text("Você • ${dist.toInt()} m • ${"%.2f".format(t)} s", fontSize = 12.sp)
+                                Text("Rival • ${oppDist.toInt()} m", fontSize = 12.sp)
+                            }
+                        }
                         Spacer(Modifier.weight(1f))
                         Row(Modifier.fillMaxWidth().height(110.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Box(
@@ -379,9 +478,11 @@ fun DragDialog(g: GameState, onClose: () -> Unit) {
                             ) { Text("⬆ MARCHA", textAlign = TextAlign.Center, fontWeight = FontWeight.Bold) }
                         }
                     }
-                    DragStage.RESULT -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(if (won) "🏆 Você venceu!" else "😬 Você perdeu...", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Text("Seu tempo: ${"%.2f".format(myT)} s  •  Rival: ${"%.2f".format(oppT)} s", fontSize = 14.sp)
+                    DragStage.RESULT -> Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        RaceScene(spr, car, myT, dist, oppT, opp2T, 0, false, 0f, false, 0f)
+                        val place = 1 + (if (oppT < myT) 1 else 0) + (if (opp2T < myT) 1 else 0)
+                        Text(if (won) "🏆 1º lugar! Você venceu!" else "😬 ${place}º lugar...", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text("Seu tempo: ${"%.2f".format(myT)} s  •  Rival: ${"%.2f".format(oppT)} s  •  3º carro: ${"%.2f".format(opp2T)} s", fontSize = 13.sp)
                         Text(
                             if (bet == 0) "Corrida de treino, sem dinheiro em jogo."
                             else if (won) "Você ganhou ${brl(bet)}." else "Você pagou ${brl(bet)} ao rival.",

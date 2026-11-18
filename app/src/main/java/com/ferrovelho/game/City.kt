@@ -238,7 +238,7 @@ fun DrawScope.drawDriver(l: Look, ci: Int, left: Float, top: Float, u: Float) {
     if (l.glasses) drawRect(dark, Offset(x + 2f * u, y + 1.4f * u), Size(2.2f * u, 0.4f * u))
 }
 
-private fun DrawScope.sp(
+fun DrawScope.sp(
     img: ImageBitmap, wx: Float, by: Float, cam: Float, s: Float,
     k: Float = 1f, flip: Boolean = false, tint: Color? = null, alpha: Float = 1f,
     carIdx: Int = -1, rot: Float = 0f, driver: Look? = null,
@@ -1152,7 +1152,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     if (garageListDlg) GarageDialog(g) { garageListDlg = false }
     if (summaryDlg) SummaryDialog(g) { summaryDlg = false }
     if (driveDlg) CarPickDialog(g, onPick = { driveId = it; driveDlg = false }, onClose = { driveDlg = false })
-    if (dragDlg) DragDialog(g) { dragDlg = false }
+    if (dragDlg) DragDialog(g, spr) { dragDlg = false }
     zoneDlg?.let { zi -> ZoneDialog(g, zi) { zoneDlg = null } }
     lojaDlg?.let { li -> LojaDialog(g, li) { lojaDlg = null } }
     bizDlg?.let { bi -> CompanyDialog(g, bi) { bizDlg = null } }
