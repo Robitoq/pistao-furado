@@ -48,7 +48,7 @@ const val VIEW_W = 190f
 private val YARD_X = listOf(520f, 1450f, 2450f, 3500f, 4450f)
 private const val HOME_X = 260f     // casa do personagem
 private const val MEET_X = 2000f    // encontro de carros
-private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X
+private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X + COMPANY_X
 private val PLACE_X = YARD_X + NEW_PLACES
 
 val CSKIN = listOf(0xFFFFDBB4, 0xFFF1C27D, 0xFFE0AC69, 0xFFC68642, 0xFF8D5524, 0xFF6B4423, 0xFF4A2C17).map { Color(it) }
@@ -551,6 +551,9 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var sleepTaxi by remember { mutableStateOf(false) }
     var lateAsk by remember { mutableStateOf(false) }
     var garageDlg by remember { mutableStateOf(false) }
+    var garageListDlg by remember { mutableStateOf(false) }
+    var summaryDlg by remember { mutableStateOf(false) }
+    var bizDlg by remember { mutableStateOf<Int?>(null) }
     var shopDlg by remember { mutableStateOf<Int?>(null) }
     var chatPed by remember { mutableStateOf<Int?>(null) }
     var sayHungry by remember { mutableStateOf(false) }
@@ -564,12 +567,13 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     val nearHome by remember { derivedStateOf { abs(px - HOME_X) < 55f } }
     val nearGarage by remember { derivedStateOf { abs(px - GARAGE_X) < 60f } }
     val nearStore by remember { derivedStateOf { STORE_X.indexOfFirst { abs(px - it) < 40f } } }
+    val nearBiz by remember { derivedStateOf { COMPANY_X.indexOfFirst { abs(px - it) < 60f } } }
     val nearPed by remember {
         derivedStateOf { peds.indices.firstOrNull { abs(peds[it].base + sin(time * 0.4f + peds[it].phase) * 60f - px) < 20f } ?: -1 }
     }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || shopDlg != null || chatPed != null
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || garageListDlg || summaryDlg || bizDlg != null || shopDlg != null || chatPed != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -888,6 +892,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 drawMeetLot(cam, s, t, night, g.minutes >= MEET_START, paint)
                 drawGarageShop(g.ownShop, garageOpen(g), cam, s, t, paint)
                 drawStores(storesOpen, cam, s, t, paint)
+                drawCompanies(g, cam, s, t, paint)
             }
 
             // ---- escuridão da noite (só no mundo, o céu já tem a própria cor) e pôr do sol
@@ -927,6 +932,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     drawMeetLit(cam, s, t, night, g.minutes >= MEET_START, paint)
                     drawGarageLit(g.ownShop, garageOpen(g), cam, s, night, paint)
                     drawStoresLit(storesOpen, cam, s, night, paint)
+                    drawCompaniesLit(g, cam, s, night, paint)
                 }
             }
 
@@ -1054,12 +1060,20 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     Button(onClick = { homeDlg = true }) { Text("🏠 Entrar em casa", fontSize = 13.sp) }
                 } else if (nearGarage) {
                     Button(onClick = { garageDlg = true }) { Text(if (g.ownShop) "🏢 Ferrovelho Motors" else "🔧 Entrar na oficina", fontSize = 13.sp) }
+                } else if (nearBiz >= 0) {
+                    Button(onClick = { bizDlg = nearBiz }) {
+                        Text(if (nearBiz in g.companies) "${COMPANY_ICONS[nearBiz]} ${COMPANY_NAMES[nearBiz]}" else "📍 Terreno à venda", fontSize = 13.sp)
+                    }
                 } else if (nearStore >= 0) {
                     Button(onClick = { shopDlg = nearStore }) { Text(STORES[nearStore].title.substringBefore(" ") + " Entrar", fontSize = 13.sp) }
                 } else if (nearPed >= 0) {
                     Button(onClick = { chatPed = nearPed }) { Text("💬 Conversar com ${pedName(nearPed)}", fontSize = 13.sp) }
                 } else {
                     Text("Explore a cidade", fontSize = 12.sp)
+                }
+                Row {
+                    TextButton(onClick = { garageListDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("🚗 Garagem", fontSize = 12.sp) }
+                    TextButton(onClick = { summaryDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("📊 Resumo", fontSize = 12.sp) }
                 }
                 Row {
                     TextButton(onClick = { taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("🚕 Táxi", fontSize = 12.sp) }
@@ -1076,6 +1090,9 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
     if (meetDlg) CarMeetDialog(g, me.name, me.look) { meetDlg = false }
     if (garageDlg) WorkshopDialog(g) { garageDlg = false }
+    if (garageListDlg) GarageDialog(g) { garageListDlg = false }
+    if (summaryDlg) SummaryDialog(g) { summaryDlg = false }
+    bizDlg?.let { bi -> CompanyDialog(g, bi) { bizDlg = null } }
     shopDlg?.let { si -> StoreDialog(g, STORES[si]) { shopDlg = null } }
     chatPed?.let { pi -> StreetChat(g, peds[pi].look, pedName(pi), me.name) { chatPed = null } }
     if (homeDlg) {

@@ -174,6 +174,16 @@ class GameState(context: Context) {
     var hunger by mutableStateOf(85.0)  // 100 = satisfeito, 0 = morrendo de fome
     var thirst by mutableStateOf(85.0)  // 100 = hidratado, 0 = morrendo de sede
     var ownShop by mutableStateOf(false) // empresa própria: oficina com desconto e aberta 24h
+    var companies by mutableStateOf(setOf<Int>())              // empresas no mapa: 0 revenda, 1 imobiliária
+    var houses by mutableStateOf(listOf<House>())              // imóveis da imobiliária
+    var houseMarket by mutableStateOf(listOf<House>())         // casas que o corretor oferece hoje
+    var stock by mutableStateOf(mapOf<String, Int>())          // "c<id>" / "h<id>" -> preço pedido na loja
+    var hSold by mutableStateOf(0)                             // casas vendidas
+    var houseSeq = 1
+    var houseIdx by mutableStateOf(1.0)      // mercado imobiliário (1.0 = normal)
+    var houseTrend = 0.0
+    var debtDays by mutableStateOf(0)        // dias seguidos no vermelho
+    var bankrupt by mutableStateOf(false)
 
     /** Desconto da empresa própria em reparos, tuning e pintura. */
     val shopDisc: Double get() = if (ownShop) 0.70 else 1.0
@@ -266,6 +276,16 @@ class GameState(context: Context) {
         hunger = 85.0
         thirst = 85.0
         ownShop = false
+        companies = emptySet()
+        houses = emptyList()
+        stock = emptyMap()
+        hSold = 0
+        houseSeq = 1
+        houseIdx = 1.0
+        houseTrend = 0.0
+        debtDays = 0
+        bankrupt = false
+        refreshHouses()
         nextId = 1
         seed = Random.nextInt()
         yards = genYards(Random(System.nanoTime()))
@@ -288,10 +308,23 @@ class GameState(context: Context) {
             msg += " 🔧 A Ferrovelho Motors rendeu ${brl(inc)} de serviços."
         }
         if (news.isNotEmpty()) msg += " 📰 $news"
-        if (garage.isEmpty() && money < 5000) {
+        val houseNews = stepHouses()
+        if (houseNews.isNotEmpty()) msg += " 🏘️ $houseNews"
+        val bills = dailyBills()
+        if (bills > 0) { money -= bills; msg += " 💸 Despesas das empresas: ${brl(bills)}." }
+        if (money < 0) {
+            money = (money * 1.01).toInt()   // juros do banco sobre a dívida
+            debtDays += 1
+            msg += " 🏦 Você está no vermelho (${brl(money)}) há $debtDays dia(s)."
+            if (debtDays >= 5 || money < -150_000) bankrupt = true
+        } else {
+            debtDays = 0
+        }
+        if (garage.isEmpty() && houses.isEmpty() && companies.isEmpty() && money in 0..4999) {
             money = 5000
             msg += " Seu tio emprestou R$ 5.000 pra você recomeçar."
         }
+        refreshHouses()
         message = msg
         save()
     }
@@ -511,6 +544,16 @@ class GameState(context: Context) {
         o.put("hunger", hunger)
         o.put("thirst", thirst)
         o.put("ownShop", ownShop)
+        o.put("companies", JSONArray().also { a -> companies.forEach { a.put(it) } })
+        o.put("houseSeq", houseSeq)
+        o.put("hSold", hSold)
+        o.put("houseIdx", houseIdx)
+        o.put("houseTrend", houseTrend)
+        o.put("debtDays", debtDays)
+        o.put("bankrupt", bankrupt)
+        o.put("houses", JSONArray().also { a -> houses.forEach { a.put(it.toJson()) } })
+        o.put("houseMkt", JSONArray().also { a -> houseMarket.forEach { a.put(it.toJson()) } })
+        o.put("stock", JSONObject().also { j -> stock.forEach { (k, v) -> j.put(k, v) } })
         o.put("nextId", nextId)
         o.put("seed", seed)
         o.put("minutes", minutes)
@@ -571,6 +614,17 @@ class GameState(context: Context) {
             }
             if (yards.size < 3) throw IllegalStateException("save antigo")
             if (yards.size < 5) yards = yards + genYards(Random(System.nanoTime())).drop(yards.size)
+            companies = o.optJSONArray("companies")?.let { a -> List(a.length()) { a.getInt(it) }.toSet() } ?: emptySet()
+            houseSeq = o.optInt("houseSeq", 1)
+            hSold = o.optInt("hSold", 0)
+            houseIdx = o.optDouble("houseIdx", 1.0)
+            houseTrend = o.optDouble("houseTrend", 0.0)
+            debtDays = o.optInt("debtDays", 0)
+            bankrupt = o.optBoolean("bankrupt", false)
+            houses = o.optJSONArray("houses")?.let { a -> List(a.length()) { a.getJSONObject(it).toHouse() } } ?: emptyList()
+            houseMarket = o.optJSONArray("houseMkt")?.let { a -> List(a.length()) { a.getJSONObject(it).toHouse() } } ?: emptyList()
+            stock = o.optJSONObject("stock")?.let { j -> j.keys().asSequence().associateWith { j.getInt(it) } } ?: emptyMap()
+            if (houseMarket.isEmpty()) refreshHouses()
             message = ""
         } catch (e: Exception) {
             newGame()
@@ -601,4 +655,13 @@ private fun YardCar.toJson(): JSONObject = JSONObject()
 private fun JSONObject.toYard(): YardCar = YardCar(
     getInt("id"), getInt("model"), getInt("year"), getInt("color"),
     getJSONArray("cond").ints(), getInt("price"),
+)
+
+private fun House.toJson(): JSONObject = JSONObject()
+    .put("id", id).put("name", name).put("hood", hood).put("value", value)
+    .put("cond", cond).put("paid", paid).put("spent", spent)
+
+private fun JSONObject.toHouse(): House = House(
+    getInt("id"), getString("name"), getString("hood"), getInt("value"),
+    getInt("cond"), getInt("paid"), optInt("spent", 0),
 )
