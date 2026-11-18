@@ -48,7 +48,7 @@ const val VIEW_W = 190f
 private val YARD_X = listOf(520f, 1450f, 2450f, 3500f, 4450f)
 private const val HOME_X = 260f     // casa do personagem
 private const val MEET_X = 2000f    // encontro de carros
-private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X + COMPANY_X
+private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X + COMPANY_X + LOJA_X + DRAG_X
 private val PLACE_X = YARD_X + NEW_PLACES
 
 val CSKIN = listOf(0xFFFFDBB4, 0xFFF1C27D, 0xFFE0AC69, 0xFFC68642, 0xFF8D5524, 0xFF6B4423, 0xFF4A2C17).map { Color(it) }
@@ -555,6 +555,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var summaryDlg by remember { mutableStateOf(false) }
     var bizDlg by remember { mutableStateOf<Int?>(null) }
     var driveId by remember { mutableStateOf<Int?>(null) }
+    var lojaDlg by remember { mutableStateOf<Int?>(null) }
     var driveDlg by remember { mutableStateOf(false) }
     var dragDlg by remember { mutableStateOf(false) }
     var vel by remember { mutableFloatStateOf(0f) }
@@ -574,13 +575,15 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     val nearHome by remember { derivedStateOf { abs(px - HOME_X) < 55f } }
     val nearGarage by remember { derivedStateOf { abs(px - GARAGE_X) < 60f } }
     val nearStore by remember { derivedStateOf { STORE_X.indexOfFirst { abs(px - it) < 40f } } }
+    val nearLoja by remember { derivedStateOf { LOJA_X.indexOfFirst { abs(px - it) < 60f } } }
+    val nearDrag by remember { derivedStateOf { abs(px - DRAG_X) < 70f } }
     val nearBiz by remember { derivedStateOf { COMPANY_X.indexOfFirst { abs(px - it) < 60f } } }
     val nearPed by remember {
         derivedStateOf { peds.indices.firstOrNull { abs(peds[it].base + sin(time * 0.4f + peds[it].phase) * 60f - px) < 20f } ?: -1 }
     }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || driveDlg || dragDlg || garageListDlg || summaryDlg || bizDlg != null || shopDlg != null || chatPed != null
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || bizDlg != null || shopDlg != null || chatPed != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -920,9 +923,12 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 }
                 drawHome(cam, s, t, night, paint)
                 drawMeetLot(cam, s, t, night, g.minutes >= MEET_START, paint)
+                garageSignText = g.motorsName().uppercase()
                 drawGarageShop(g.ownShop, garageOpen(g), cam, s, t, paint)
                 drawStores(storesOpen, cam, s, t, paint)
                 drawCompanies(g, cam, s, t, paint)
+                drawLojas(g, cam, s, t, paint)
+                drawDragStrip(cam, s, t, paint)
             }
 
             // ---- escuridão da noite (só no mundo, o céu já tem a própria cor) e pôr do sol
@@ -963,6 +969,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     drawGarageLit(g.ownShop, garageOpen(g), cam, s, night, paint)
                     drawStoresLit(storesOpen, cam, s, night, paint)
                     drawCompaniesLit(g, cam, s, night, paint)
+                    drawLojasLit(g, cam, s, night, paint)
                 }
             }
 
@@ -990,7 +997,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     val csi = carSpriteFor(CATALOG[dcar.model].body)
                     val cimg = spr.cars[csi]
                     val ctint = Color(PAINTS[dcar.color].second).copy(alpha = 0.35f)
-                    sp(cimg, px - cimg.width * 0.95f / 2f, 114f, cam, s, 0.95f, face < 0, ctint, 1f, csi, odo / 4.5f, look)
+                    val laneY = if (face < 0) 148f else 133f
+                    sp(cimg, px - cimg.width * 1.1f / 2f, laneY, cam, s, 1.1f, face < 0, ctint, 1f, csi, odo / 4.5f, look)
                 } else {
                     drawChar(look, (px - 6f - cam) * s, (115f - 26f) * s, s, face < 0, if (moving) 1f else 0f,
                         t * (if (run) 16f else 10f))
@@ -1097,10 +1105,14 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 } else if (nearHome) {
                     Button(onClick = { homeDlg = true }) { Text("🏠 Entrar em casa", fontSize = 13.sp) }
                 } else if (nearGarage) {
-                    Button(onClick = { garageDlg = true }) { Text(if (g.ownShop) "🏢 Ferrovelho Motors" else "🔧 Entrar na oficina", fontSize = 13.sp) }
+                    Button(onClick = { garageDlg = true }) { Text(if (g.ownShop) "🏢 ${g.motorsName()}" else "🔧 Entrar na oficina", fontSize = 13.sp) }
+                } else if (nearDrag) {
+                    Button(onClick = { dragDlg = true }) { Text("🏁 Pista de Arrancada", fontSize = 13.sp) }
+                } else if (nearLoja >= 0) {
+                    Button(onClick = { lojaDlg = nearLoja }) { Text(lojaLabel(g, nearLoja), fontSize = 13.sp) }
                 } else if (nearBiz >= 0) {
                     Button(onClick = { bizDlg = nearBiz }) {
-                        Text(if (nearBiz in g.companies) "${COMPANY_ICONS[nearBiz]} ${COMPANY_NAMES[nearBiz]}" else "📍 Terreno à venda", fontSize = 13.sp)
+                        Text(if (nearBiz in g.companies) "${COMPANY_ICONS[nearBiz]} ${g.empName(nearBiz)}" else "📍 Terreno à venda", fontSize = 13.sp)
                     }
                 } else if (nearStore >= 0) {
                     Button(onClick = { shopDlg = nearStore }) { Text(STORES[nearStore].title.substringBefore(" ") + " Entrar", fontSize = 13.sp) }
@@ -1111,7 +1123,6 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 }
                 Row {
                     TextButton(onClick = { if (driveId != null) driveId = null else driveDlg = true }, contentPadding = PaddingValues(6.dp)) { Text(if (driveId != null) "🚶 Descer" else "🚘 Dirigir", fontSize = 12.sp) }
-                    TextButton(onClick = { dragDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("🏁 Arrancada", fontSize = 12.sp) }
                 }
                 Row {
                     TextButton(onClick = { garageListDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("🚗 Garagem", fontSize = 12.sp) }
@@ -1136,6 +1147,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     if (summaryDlg) SummaryDialog(g) { summaryDlg = false }
     if (driveDlg) CarPickDialog(g, onPick = { driveId = it; driveDlg = false }, onClose = { driveDlg = false })
     if (dragDlg) DragDialog(g) { dragDlg = false }
+    lojaDlg?.let { li -> LojaDialog(g, li) { lojaDlg = null } }
     bizDlg?.let { bi -> CompanyDialog(g, bi) { bizDlg = null } }
     shopDlg?.let { si -> StoreDialog(g, STORES[si]) { shopDlg = null } }
     chatPed?.let { pi -> StreetChat(g, peds[pi].look, pedName(pi), me.name) { chatPed = null } }
@@ -1241,9 +1253,48 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                                     taxi = false
                                 },
                                 Modifier.fillMaxWidth(),
-                            ) { Text("${COMPANY_ICONS[ci]} ${COMPANY_NAMES[ci]} - ${brl(fareC)}", fontSize = 13.sp) }
+                            ) { Text("${COMPANY_ICONS[ci]} ${g.empName(ci)} - ${brl(fareC)}", fontSize = 13.sp) }
                         }
                     }
+                    LOJA_X.forEachIndexed { li, lxx ->
+                        val lt = g.lojas[li]
+                        if (lt != null) {
+                            val distL = abs(px - lxx)
+                            val fareL = taxiFare(distL)
+                            OutlinedButton(
+                                onClick = {
+                                    if (g.money < fareL) {
+                                        g.message = "Sem dinheiro pro táxi."
+                                    } else {
+                                        g.money -= fareL
+                                        g.spendTime(taxiMinutes(distL))
+                                        px = lxx - 75f
+                                        prefs.edit().putFloat("x", px).apply()
+                                        g.save()
+                                    }
+                                    taxi = false
+                                },
+                                Modifier.fillMaxWidth(),
+                            ) { Text("${LOJA_ICONS[lt]} ${g.lojaName(li)} - ${brl(fareL)}", fontSize = 13.sp) }
+                        }
+                    }
+                    val distD = abs(px - DRAG_X)
+                    val fareD = taxiFare(distD)
+                    OutlinedButton(
+                        onClick = {
+                            if (g.money < fareD) {
+                                g.message = "Sem dinheiro pro táxi."
+                            } else {
+                                g.money -= fareD
+                                g.spendTime(taxiMinutes(distD))
+                                px = DRAG_X - 75f
+                                prefs.edit().putFloat("x", px).apply()
+                                g.save()
+                            }
+                            taxi = false
+                        },
+                        Modifier.fillMaxWidth(),
+                    ) { Text("🏁 Pista de Arrancada - ${brl(fareD)}", fontSize = 13.sp) }
                     val fareH = taxiFare(abs(px - HOME_X))
                     OutlinedButton(
                         onClick = { taxi = false; rideHome() },

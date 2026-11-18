@@ -180,6 +180,10 @@ class GameState(context: Context) {
     var stock by mutableStateOf(mapOf<String, Int>())          // "c<id>" / "h<id>" -> preço pedido na loja
     var hSold by mutableStateOf(0)                             // casas vendidas
     var houseSeq = 1
+    var nomes by mutableStateOf(mapOf<String, String>())   // nomes escolhidos: "e0" empresa, "l0" loja, "o" oficina
+    var lojas by mutableStateOf(mapOf<Int, Int>())       // terreno -> tipo de loja
+    var lojaPreco by mutableStateOf(mapOf<Int, Int>())   // terreno -> 0 barato, 1 normal, 2 caro
+    var lojaUltimo by mutableStateOf(mapOf<Int, Int>())  // terreno -> lucro do último dia
     var houseIdx by mutableStateOf(1.0)      // mercado imobiliário (1.0 = normal)
     var houseTrend = 0.0
     var debtDays by mutableStateOf(0)        // dias seguidos no vermelho
@@ -281,6 +285,10 @@ class GameState(context: Context) {
         stock = emptyMap()
         hSold = 0
         houseSeq = 1
+        nomes = emptyMap()
+        lojas = emptyMap()
+        lojaPreco = emptyMap()
+        lojaUltimo = emptyMap()
         houseIdx = 1.0
         houseTrend = 0.0
         debtDays = 0
@@ -312,6 +320,8 @@ class GameState(context: Context) {
         if (houseNews.isNotEmpty()) msg += " 🏘️ $houseNews"
         val bills = dailyBills()
         if (bills > 0) { money -= bills; msg += " 💸 Despesas das empresas: ${brl(bills)}." }
+        val lojaMsg = stepLojas()
+        if (lojaMsg.isNotEmpty()) msg += " $lojaMsg"
         if (money < 0) {
             money = (money * 1.01).toInt()   // juros do banco sobre a dívida
             debtDays += 1
@@ -547,6 +557,10 @@ class GameState(context: Context) {
         o.put("companies", JSONArray().also { a -> companies.forEach { a.put(it) } })
         o.put("houseSeq", houseSeq)
         o.put("hSold", hSold)
+        o.put("nomes", JSONObject().also { j -> nomes.forEach { (k, v) -> j.put(k, v) } })
+        o.put("lojas", lojas.toJsonMap())
+        o.put("lojaPreco", lojaPreco.toJsonMap())
+        o.put("lojaUltimo", lojaUltimo.toJsonMap())
         o.put("houseIdx", houseIdx)
         o.put("houseTrend", houseTrend)
         o.put("debtDays", debtDays)
@@ -617,6 +631,10 @@ class GameState(context: Context) {
             companies = o.optJSONArray("companies")?.let { a -> List(a.length()) { a.getInt(it) }.toSet() } ?: emptySet()
             houseSeq = o.optInt("houseSeq", 1)
             hSold = o.optInt("hSold", 0)
+            nomes = o.optJSONObject("nomes")?.let { j -> j.keys().asSequence().associateWith { j.getString(it) } } ?: emptyMap()
+            lojas = o.optJSONObject("lojas").toIntMap()
+            lojaPreco = o.optJSONObject("lojaPreco").toIntMap()
+            lojaUltimo = o.optJSONObject("lojaUltimo").toIntMap()
             houseIdx = o.optDouble("houseIdx", 1.0)
             houseTrend = o.optDouble("houseTrend", 0.0)
             debtDays = o.optInt("debtDays", 0)
@@ -665,3 +683,8 @@ private fun JSONObject.toHouse(): House = House(
     getInt("id"), getString("name"), getString("hood"), getInt("value"),
     getInt("cond"), getInt("paid"), optInt("spent", 0),
 )
+
+private fun Map<Int, Int>.toJsonMap(): JSONObject = JSONObject().also { j -> forEach { (k, v) -> j.put(k.toString(), v) } }
+
+private fun JSONObject?.toIntMap(): Map<Int, Int> =
+    if (this == null) emptyMap() else keys().asSequence().associate { it.toInt() to getInt(it) }

@@ -128,7 +128,7 @@ private fun DrawScope.garageSign(own: Boolean, cx: Float, cam: Float, s: Float, 
     val trim = if (own) Color(0xFFD32F2F) else Color(0xFFFFC107)
     wr(Color(0xFF212121), cx - 50f, 34f, 100f, 16f, cam, s)
     wr(trim, cx - 48f, 36f, 96f, 12f, cam, s)
-    label(p, if (own) "FERROVELHO MOTORS" else "OFICINA DO TIÃO", cx, 45.5f, cam, s, 6.2f,
+    label(p, if (own) garageSignText else "OFICINA DO TIÃO", cx, 45.5f, cam, s, if (own && garageSignText.length > 14) 4.6f else 6.2f,
         if (own) 0xFFFFFFFF.toInt() else 0xFF212121.toInt())
 }
 
@@ -449,7 +449,7 @@ fun WorkshopDialog(g: GameState, onClose: () -> Unit) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (g.ownShop) "🏢 Ferrovelho Motors" else "🔧 Oficina do Tião", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(if (g.ownShop) "🏢 ${g.motorsName()}" else "🔧 Oficina do Tião", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text("${g.dateText()}  •  ${brl(g.money)}", fontSize = 11.sp)
                     }
                     TextButton(onClick = onClose) { Text("✖ Sair") }
@@ -561,7 +561,8 @@ private fun ColumnScope.WorkshopBody(g: GameState) {
 @Composable
 private fun CompanyTab(g: GameState) {
     if (g.ownShop) {
-        Text("🏢 Ferrovelho Motors — sua empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text("🏢 ${g.motorsName()} — sua empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        RenameButton(g, "o", g.motorsName())
         Text("• Oficina aberta 24 horas\n• 30% de desconto em peças, tuning e pintura\n• Rende dinheiro todo dia com serviços de clientes", fontSize = 13.sp)
         Text("Carros vendidos: ${g.sold}\nLucro total: ${brl(g.totalProfit)}", fontSize = 13.sp)
     } else {
