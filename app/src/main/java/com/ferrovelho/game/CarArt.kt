@@ -159,15 +159,55 @@ val CAR_SHAPES: Map<Body, CarShape> = mapOf(
         listOf(f(20.4f, 5.9f, 29.6f, 5.8f, 29.6f, 9.2f, 17f, 9.2f), f(30.6f, 5.8f, 37f, 5.7f, 41.6f, 9.2f, 30.6f, 9.2f)),
         f(18f, 30f, 46f), 13f, 49f, 4.6f, 31.5f to 6f, chrome = true,
     ),
-    Body.VAN to CarShape(
-        f(1f, 18f, 0.6f, 6f, 3f, 3.4f, 52f, 3.4f, 58f, 9f, 61.2f, 12f, 61.2f, 18f),
-        listOf(f(5f, 5f, 17f, 5f, 17f, 9f, 5f, 9f), f(18f, 5f, 30f, 5f, 30f, 9f, 18f, 9f), f(31f, 5f, 49f, 5f, 54f, 9f, 31f, 9f)),
-        f(17.5f, 30.5f, 52f), 13f, 49f, 4.6f, 40f to 5.4f,
+    Body.VAN to CarShape(   // Kombi: frente reta, teto chato e parabrisa quase em pé
+        f(1f, 18f, 0.4f, 6f, 1.4f, 3.6f, 3f, 2.8f, 55f, 2.8f, 59.5f, 5f, 60.8f, 10f, 61.4f, 12.6f, 61.2f, 18f),
+        listOf(f(4.6f, 4.4f, 16.6f, 4.4f, 16.6f, 9f, 4.6f, 9f), f(17.6f, 4.4f, 29.6f, 4.4f, 29.6f, 9f, 17.6f, 9f), f(30.6f, 4.4f, 52f, 4.4f, 58.2f, 9.2f, 30.6f, 9.2f)),
+        f(17.5f, 30.5f, 52f), 12f, 50f, 4.4f, 45f to 5.6f, chrome = true,
     ),
     Body.BEETLE to CarShape(
         f(1f, 18f, 1f, 13f, 6f, 9f, 20f, 5.2f, 34f, 5f, 46f, 9.4f, 58f, 12f, 61.4f, 14.5f, 61.2f, 18f),
         listOf(f(21f, 6.4f, 33f, 6.2f, 33f, 9.6f, 14f, 9.6f), f(34f, 6.2f, 38f, 6.4f, 43.6f, 9.8f, 34f, 9.8f)),
         f(22f, 46f), 13f, 49f, 4.6f, 30f to 6.6f, chrome = true,
+    ),
+    Body.UNO to CarShape(   // Uno: bem quadradão, traseira reta e teto alto
+        f(1f, 18f, 0.6f, 10f, 1.2f, 7.6f, 3.2f, 3.8f, 37f, 3.6f, 45.5f, 9.2f, 58f, 10.6f, 61.4f, 13f, 61.2f, 18f),
+        listOf(f(5f, 4.9f, 17.5f, 4.9f, 17.5f, 9f, 5f, 9f), f(18.5f, 4.9f, 36f, 4.8f, 42f, 9f, 18.5f, 9f)),
+        f(18f, 44f), 11f, 49f, 4.4f, 29f to 5.6f,
+    ),
+    Body.GOL to CarShape(   // Gol: porta-malas inclinado, capô reto e frente vertical
+        f(1f, 18f, 0.6f, 11f, 3f, 9.4f, 16f, 5f, 37f, 4.4f, 45f, 9.2f, 59f, 10.2f, 61.4f, 12.6f, 61.2f, 18f),
+        listOf(f(16.5f, 6f, 28f, 5.8f, 28f, 9.2f, 10.5f, 9.2f), f(29f, 5.8f, 37f, 5.6f, 42.4f, 9.2f, 29f, 9.2f)),
+        f(19f, 29f, 45f), 12f, 49f, 4.5f, 31f to 6f,
+    ),
+    Body.NOTCH to CarShape(   // Jetta: sedã de 3 volumes, porta-malas alto e capô longo
+        f(1f, 18f, 0.6f, 10.6f, 2f, 9f, 17f, 8.8f, 23f, 4.8f, 37f, 4.6f, 46f, 9f, 59f, 9.8f, 61.4f, 11.8f, 61.2f, 18f),
+        listOf(f(23.4f, 5.9f, 31f, 5.8f, 31f, 9f, 21f, 9f), f(32f, 5.8f, 37f, 5.7f, 44f, 9f, 32f, 9f)),
+        f(21f, 31f, 46f), 13f, 50f, 4.7f, 32f to 6f,
+    ),
+    Body.OPALA to CarShape(   // Opala: sedã longo e baixo, cromado
+        f(1f, 18f, 0.6f, 11f, 3f, 9.4f, 18f, 9.2f, 25f, 5.2f, 37f, 5f, 47f, 9.2f, 59f, 9.8f, 61.4f, 12f, 61.2f, 18f),
+        listOf(f(25.4f, 6.2f, 33f, 6.1f, 33f, 9.2f, 22f, 9.2f), f(34f, 6.1f, 38f, 6f, 44.6f, 9.2f, 34f, 9.2f)),
+        f(22f, 33.5f, 47f), 13f, 49f, 4.8f, 33f to 6.4f, chrome = true,
+    ),
+    Body.MUSCLE to CarShape(   // muscle car: capô comprido, cabine recuada e traseira curta
+        f(1f, 18f, 0.6f, 11.4f, 2f, 9.4f, 14f, 9f, 23f, 6.2f, 33f, 5.8f, 41f, 9.6f, 59f, 10.2f, 61.4f, 12.6f, 61.2f, 18f),
+        listOf(f(23.6f, 7f, 32.6f, 6.8f, 32.6f, 9.4f, 17f, 9.4f), f(33.6f, 6.8f, 35f, 6.7f, 40f, 9.4f, 33.6f, 9.4f)),
+        f(24f, 40f), 13f, 50f, 5f, 29f to 7.4f,
+    ),
+    Body.P911 to CarShape(   // 911: teto em arco descendo até a traseira
+        f(1f, 18f, 0.6f, 12.2f, 3f, 10.4f, 14f, 8f, 28f, 5.8f, 34f, 5.8f, 43f, 10f, 58f, 11.2f, 61.4f, 13.4f, 61.2f, 18f),
+        listOf(f(17f, 8f, 28.2f, 6.6f, 34f, 6.6f, 40.4f, 9.6f, 17f, 9.6f)),
+        f(26f, 42f), 13f, 50f, 4.9f, 30f to 7f,
+    ),
+    Body.JEEP to CarShape(   // Jeep: tudo reto, parabrisa em pé e capô plano
+        f(1f, 18f, 0.6f, 8.4f, 2f, 6.4f, 4f, 4.6f, 36f, 4.6f, 38f, 8.2f, 55f, 8.6f, 61.4f, 11.6f, 61.2f, 18f),
+        listOf(f(6f, 5.6f, 20f, 5.6f, 20f, 8.2f, 6f, 8.2f), f(21f, 5.6f, 35.6f, 5.6f, 37.6f, 8.2f, 21f, 8.2f)),
+        f(20.5f, 36f), 12f, 50f, 5.4f, 29f to 6f,
+    ),
+    Body.MINI to CarShape(   // Mini: curtinho, teto alto e frente reta
+        f(1f, 18f, 0.6f, 10.5f, 1.4f, 8f, 4f, 4.6f, 38f, 4.4f, 44f, 8.8f, 56f, 9.6f, 60.6f, 10.4f, 61.4f, 12.8f, 61.2f, 18f),
+        listOf(f(6f, 5.4f, 24f, 5.4f, 24f, 8.8f, 6f, 8.8f), f(25f, 5.4f, 38f, 5.3f, 42.6f, 8.8f, 25f, 8.8f)),
+        f(24.5f, 44f), 11.5f, 49f, 4.8f, 31f to 6f,
     ),
     Body.SUPER to CarShape(
         f(1f, 18f, 0.6f, 14f, 8f, 12f, 26f, 8f, 38f, 7f, 50f, 11.4f, 61.4f, 14.2f, 61.2f, 18f),

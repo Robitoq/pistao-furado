@@ -120,6 +120,8 @@ fun carSpriteFor(b: Body): Int = when (b) {
     Body.BOXY -> 0; Body.COMPACT -> 1; Body.WAGON -> 2; Body.MPV -> 4; Body.HATCH -> 1
     Body.SEDAN -> 5; Body.SUV -> 6; Body.PICKUP -> 8; Body.COUPE -> 3; Body.CLASSIC -> 7
     Body.VAN -> 4; Body.BEETLE -> 1; Body.SUPER -> 3
+    Body.UNO -> 0; Body.GOL -> 1; Body.NOTCH -> 5; Body.OPALA -> 7; Body.MUSCLE -> 3
+    Body.P911 -> 3; Body.JEEP -> 6; Body.MINI -> 1
     else -> 5
 }
 

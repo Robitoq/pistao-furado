@@ -465,6 +465,7 @@ fun RepairCard(g: GameState, car: OwnedCar, i: Int, name: String) {
 @Composable
 fun TuningCard(g: GameState, car: OwnedCar, t: Tuning, modifier: Modifier) {
     val has = t.id in car.tuning
+    val block = tuneBlock(CATALOG[car.model], t)
     val accent = if (has) GREEN else Color(0xFFB39DDB)
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
     val emoji = t.name.takeWhile { !it.isLetter() }.trim()
@@ -480,6 +481,8 @@ fun TuningCard(g: GameState, car: OwnedCar, t: Tuning, modifier: Modifier) {
             Text("+${(t.valuePct * 100).roundToInt()}% valor", color = accent, fontSize = 11.sp)
             if (has) {
                 Text("✓ Instalado", color = GREEN, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            } else if (block != null) {
+                Text("🚫 $block", color = Color(0xFFEF9A9A), fontSize = 11.sp, textAlign = TextAlign.Center)
             } else {
                 FilledTonalButton(
                     onClick = { g.install(car.id, t) },

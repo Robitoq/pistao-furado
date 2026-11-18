@@ -435,6 +435,7 @@ class GameState(context: Context) {
     fun install(carId: Int, t: Tuning) {
         val car = garage.firstOrNull { it.id == carId } ?: return
         if (t.id in car.tuning) return
+        tuneBlock(CATALOG[car.model], t)?.let { message = "${t.name}: $it."; return }
         val price = tuningPrice(car, t)
         if (price > money) { message = "Dinheiro insuficiente."; return }
         money -= price

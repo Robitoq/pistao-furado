@@ -1,6 +1,7 @@
 package com.ferrovelho.game
 
-enum class Body { BOXY, COMPACT, WAGON, MPV, HATCH, SEDAN, SUV, PICKUP, COUPE, CLASSIC, VAN, BEETLE, SUPER }
+enum class Body { BOXY, COMPACT, WAGON, MPV, HATCH, SEDAN, SUV, PICKUP, COUPE, CLASSIC, VAN, BEETLE, SUPER,
+    UNO, GOL, NOTCH, OPALA, MUSCLE, P911, JEEP, MINI }
 
 enum class Cat(val label: String) {
     POPULAR("Popular"),
@@ -40,7 +41,15 @@ private val CL = Cat.CLASSICO
 
 /** Silhueta própria por modelo (o que não estiver aqui usa a carroceria genérica da linha). */
 private val SHAPE: Map<String, Body> = buildMap {
-    listOf("Uno", "147", "Gol", "Brasília", "Kadett GSi", "Escort XR3", "Soul", "Kwid", "BR-800", "Fiorino")
+    listOf("Uno", "147").forEach { put(it, Body.UNO) }
+    listOf("Gol", "Gol GTI").forEach { put(it, Body.GOL) }
+    listOf("Jetta", "Santana", "Passat", "Voyage").forEach { put(it, Body.NOTCH) }
+    listOf("Opala", "Corcel").forEach { put(it, Body.OPALA) }
+    listOf("Camaro SS", "Mustang GT", "Maverick GT", "Challenger", "Charger").forEach { put(it, Body.MUSCLE) }
+    listOf("911 Carrera", "718 Cayman").forEach { put(it, Body.P911) }
+    listOf("Wrangler", "Jeep CJ", "T4", "Defender", "Marruá", "Xavante", "Bandeirante").forEach { put(it, Body.JEEP) }
+    listOf("Cooper S", "John Cooper Works", "Abarth 500").forEach { put(it, Body.MINI) }
+    listOf("Brasília", "Kadett GSi", "Escort XR3", "Soul", "Kwid", "BR-800", "Fiorino")
         .forEach { put(it, Body.BOXY) }
     listOf("Palio", "Mobi", "Argo", "Punto", "Celta", "Corsa", "Onix", "Agile", "Ka", "Fiesta", "Up!", "Fox",
         "Polo", "HB20", "March", "206", "207", "208", "Etios", "Sandero", "Yaris", "Twingo", "Clio", "Dolphin")
@@ -281,3 +290,25 @@ val CATALOG: List<CarModel> = listOf(
     m("Ferrari", "488 GTB", 2000000, Body.SUPER, ES, 2015, 2019),
     m("Lamborghini", "Huracán", 2500000, Body.SUPER, ES, 2014, 2026),
 )
+
+/**
+ * Quais peças de tuning cabem em cada carro. Retorna o motivo de NÃO caber (null = cabe).
+ * Pra mudar uma regra, é só mexer nas listas abaixo.
+ */
+fun tuneBlock(m: CarModel, t: Tuning): String? {
+    val b = m.body
+    val ev = m.name == "Dolphin" || m.name == "Seal"
+    return when (t.id) {
+        "aerofolio" -> if (b in listOf(Body.PICKUP, Body.VAN, Body.JEEP, Body.SUV, Body.MPV, Body.BEETLE, Body.SUPER, Body.P911))
+            "Não cabe nesse carro" else null
+        "parachoque" -> if (b in listOf(Body.VAN, Body.JEEP, Body.BEETLE, Body.CLASSIC, Body.OPALA, Body.SUPER))
+            "Não existe kit pra ele" else null
+        "turbo" -> if (ev) "Carro elétrico, sem motor a combustão"
+            else if (b in listOf(Body.VAN, Body.SUPER)) "Não serve nesse motor" else null
+        "escape" -> if (ev) "Carro elétrico, sem escapamento" else null
+        "rebaixada" -> if (b in listOf(Body.PICKUP, Body.JEEP, Body.SUV, Body.SUPER, Body.P911))
+            "Não rebaixa esse carro" else null
+        "pelicula" -> if (b == Body.JEEP) "Sem vidros fechados" else null
+        else -> null
+    }
+}
