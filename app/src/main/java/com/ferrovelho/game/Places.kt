@@ -522,9 +522,9 @@ private fun ColumnScope.WorkshopBody(g: GameState) {
                         }
                     }
                 }
-                if (g.repairAllCost(car) > 0) {
+                if (car.cond.any { it < MAX_COND }) {
                     Button(onClick = { g.repairAll(car.id) }, Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
-                        Text("🛠️ Mandar o Tião reparar tudo · ${brl(g.repairAllCost(car))}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("🛠️ Mandar o Tião reparar tudo · ${if (g.ownShop) "GRÁTIS" else brl(g.repairAllCost(car))}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
@@ -563,13 +563,13 @@ private fun CompanyTab(g: GameState) {
     if (g.ownShop) {
         Text("🏢 ${g.motorsName()} — sua empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         RenameButton(g, "o", g.motorsName())
-        Text("• Oficina aberta 24 horas\n• 30% de desconto em peças, tuning e pintura\n• Rende dinheiro todo dia com serviços de clientes", fontSize = 13.sp)
+        Text("• Oficina aberta 24 horas\n• peças, tuning e pintura de graça pra você\n• Rende dinheiro todo dia com serviços de clientes", fontSize = 13.sp)
         Text("Carros vendidos: ${g.sold}\nLucro total: ${brl(g.totalProfit)}", fontSize = 13.sp)
     } else {
         Text("🏗️ Montar minha própria empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text(
             "Chega de pagar oficina dos outros. Compre, conserte e revenda com a sua marca:\n" +
-                "• Placa nova: Ferrovelho Motors\n• Oficina aberta 24 horas\n• 30% de desconto em peças, tuning e pintura\n• Renda extra todo dia com serviços de clientes",
+                "• Placa nova: Ferrovelho Motors\n• Oficina aberta 24 horas\n• peças, tuning e pintura de graça pra você\n• Renda extra todo dia com serviços de clientes",
             fontSize = 13.sp,
         )
         Button(onClick = { g.buildShop() }, enabled = g.money >= SHOP_COST, modifier = Modifier.fillMaxWidth().height(50.dp)) {

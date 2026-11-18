@@ -190,7 +190,7 @@ class GameState(context: Context) {
     var bankrupt by mutableStateOf(false)
 
     /** Desconto da empresa própria em reparos, tuning e pintura. */
-    val shopDisc: Double get() = if (ownShop) 0.70 else 1.0
+    val shopDisc: Double get() = if (ownShop) 0.0 else 1.0   // oficina própria: peças, tuning e pintura de graça
     val starving: Boolean get() = hunger < 15.0 || thirst < 15.0
 
     private var nextId = 1
@@ -419,7 +419,7 @@ class GameState(context: Context) {
 
     /** Custo das peças de UMA tentativa do minigame (metade do preço de +10 pontos). */
     fun mechanicCost(car: OwnedCar, part: Int): Int =
-        (repairCost(car, part, car.cond[part] + 10) * 0.5).roundToInt().coerceAtLeast(20)
+        (repairCost(car, part, car.cond[part] + 10) * 0.5).roundToInt().let { if (ownShop) 0 else it.coerceAtLeast(20) }
 
     /** Resultado de uma tentativa do minigame: cobra as peças e aplica os pontos ganhos (0 se errou). */
     fun mechanicTry(carId: Int, part: Int, pts: Int): Boolean {
@@ -463,12 +463,12 @@ class GameState(context: Context) {
     fun repairAll(carId: Int) {
         val car = garage.firstOrNull { it.id == carId } ?: return
         val cost = repairAllCost(car)
-        if (cost == 0) return
+        if (car.cond.all { it >= MAX_COND }) return
         if (cost > money) { message = "Dinheiro insuficiente pra reparar tudo (${brl(cost)})."; return }
         money -= cost
         tick(120)
         update(carId) { it.copy(cond = List(5) { MAX_COND }, spent = it.spent + cost) }
-        message = "Carro 100% revisado por ${brl(cost)}."
+        message = if (cost == 0) "Carro 100% revisado (de graça, a oficina é sua)." else "Carro 100% revisado por ${brl(cost)}."
         save()
     }
 
@@ -484,7 +484,7 @@ class GameState(context: Context) {
         money -= price
         tick(90)
         update(carId) { it.copy(tuning = it.tuning + t.id, spent = it.spent + price) }
-        message = "Instalou ${t.name} por ${brl(price)}."
+        message = if (price == 0) "Instalou ${t.name} (grátis, a oficina é sua)." else "Instalou ${t.name} por ${brl(price)}."
         save()
     }
 
@@ -498,7 +498,7 @@ class GameState(context: Context) {
         money -= cost
         tick(120)
         update(carId) { it.copy(color = colorIdx, spent = it.spent + cost) }
-        message = "Pintou de ${PAINTS[colorIdx].first} por ${brl(cost)}."
+        message = if (cost == 0) "Pintou de ${PAINTS[colorIdx].first} (grátis, a oficina é sua)." else "Pintou de ${PAINTS[colorIdx].first} por ${brl(cost)}."
         save()
     }
 

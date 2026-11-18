@@ -1,7 +1,21 @@
 package com.ferrovelho.game
 
 import android.graphics.Paint
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
+import kotlin.math.abs
+import kotlin.math.sin
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -151,6 +165,8 @@ fun GameState.unstock(key: String) {
 class Customer(val key: String, val who: String, val what: String, startOffer: Int, val limit: Int, val ask: Int) {
     var offer by mutableIntStateOf(startOffer)
     var msg by mutableStateOf("")
+    var myLine by mutableStateOf("")
+    var round by mutableIntStateOf(0)
 }
 
 /** Clientes do dia: sempre os mesmos pro mesmo dia e preço (reabrir a loja não rerrola). */
@@ -379,7 +395,11 @@ private fun ColumnScope.DealerBody(g: GameState) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("${CATALOG[car.model].fullName} ${car.year}", fontWeight = FontWeight.Bold)
-                    Text("Investido ${brl(car.paid + car.spent)} • vale hoje ${brl(g.marketValue(car))}", fontSize = 12.sp)
+                    CarArt(CATALOG[car.model].body, car.color, car.tuning, car.cond, Modifier.fillMaxWidth().height(80.dp))
+                    val inv = car.paid + car.spent
+                    val worth = g.marketValue(car)
+                    Text("Investido ${brl(inv)} • vale hoje ${brl(worth)}", fontSize = 12.sp)
+                    Text("Condição média ${car.cond.average().roundToInt()}% • ${car.tuning.size} upgrades • lucro estimado a preço de tabela: ${brl(worth - inv)}", fontSize = 11.sp)
                     PriceRow(g, "c${car.id}", roundTo50(g.marketValue(car) * 1.12))
                 }
             }
@@ -427,6 +447,45 @@ private fun ColumnScope.RealtyBody(g: GameState) {
 }
 
 @Composable
+private fun DealScene(c: Customer, me: Look, buyer: Look, home: Boolean) {
+    val anim = rememberInfiniteTransition(label = "deal")
+    val t by anim.animateFloat(0f, 1000f, infiniteRepeatable(tween(1_000_000, easing = LinearEasing), RepeatMode.Restart), label = "t")
+    var meTalks by remember { mutableStateOf(false) }
+    LaunchedEffect(c.round) { meTalks = c.round > 0; delay(1100); meTalks = false }
+    val greet = "Boa tarde! Gostei do ${c.what}. Faço ${brl(c.offer)}, topa?"
+    val buyerLine = if (c.msg.isNotEmpty()) c.msg else greet
+    val myLine = if (c.myLine.isNotEmpty()) c.myLine else "Olha, esse é o melhor que tenho! Peço ${brl(c.ask)}."
+    Box(
+        Modifier.fillMaxWidth().height(170.dp).background(
+            Brush.verticalGradient(listOf(Color(0xFF2B3A55), Color(0xFF55657F), Color(0xFF3A3A44))), RoundedCornerShape(12.dp),
+        ),
+    ) {
+        Canvas(Modifier.matchParentSize()) {
+            val floor = size.height * 0.94f
+            val cu = size.height * 0.5f / 26f
+            drawRect(Color(0xFF2A2B33), Offset(0f, floor - cu * 1.2f), androidx.compose.ui.geometry.Size(size.width, size.height - floor + cu * 1.2f))
+            val hop = { talk: Boolean -> if (talk) abs(sin(t * 9f)) * cu * 0.9f else 0f }
+            val lunge = if (meTalks) sin(t * 5f) * cu * 1.2f + cu else 0f
+            val lunge2 = if (!meTalks) -(sin(t * 5f) * cu * 1.2f + cu) else 0f
+            val top = floor - 24.5f * cu
+            drawChar(me, size.width * 0.12f + lunge, top - hop(meTalks), cu, false, 0f, t * 2f)
+            drawChar(buyer, size.width * 0.88f - 12f * cu + lunge2, top - hop(!meTalks), cu, true, 0f, t * 2f + 1.7f)
+        }
+        Text(if (home) "🏠" else "🚗", Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp), fontSize = 30.sp)
+        Text(
+            buyerLine, Modifier.align(Alignment.TopEnd).padding(8.dp).fillMaxWidth(0.62f)
+                .background(Color.White.copy(alpha = if (meTalks) 0.7f else 1f), RoundedCornerShape(10.dp)).padding(7.dp),
+            fontSize = 11.sp, color = Color.Black,
+        )
+        Text(
+            myLine, Modifier.align(Alignment.CenterStart).padding(start = 8.dp, top = 28.dp).fillMaxWidth(0.56f)
+                .background(Color(0xFFD1C4FF).copy(alpha = if (meTalks) 1f else 0.7f), RoundedCornerShape(10.dp)).padding(7.dp),
+            fontSize = 11.sp, color = Color.Black,
+        )
+    }
+}
+
+@Composable
 private fun CustomerSection(g: GameState) {
     Text("👥 Clientes na loja", fontSize = 15.sp, fontWeight = FontWeight.Bold)
     if (g.minutes !in (8 * 60) until (20 * 60)) {
@@ -437,12 +496,14 @@ private fun CustomerSection(g: GameState) {
     if (custs.isEmpty()) {
         Text("Ninguém por aqui agora. Ponha itens à venda com preço justo pra atrair clientes.", fontSize = 13.sp)
     }
+    val ctx = LocalContext.current
+    val myLook = remember { loadProfile(ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE))?.look ?: randomLook(Random(1)) }
     custs.toList().forEach { c ->
         Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                DealScene(c, myLook, remember(c.who, c.key) { randomLook(Random(c.who.hashCode() * 31 + c.key.hashCode())) }, !c.key.startsWith("c"))
                 Text("🙋 ${c.who} quer: ${c.what}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 Text("Seu preço: ${brl(c.ask)} • Oferta dele(a): ${brl(c.offer)}", fontSize = 13.sp)
-                if (c.msg.isNotEmpty()) Text("💬 ${c.msg}", fontSize = 12.sp)
                 Button(
                     onClick = { closeDeal(g, c, c.offer); custs.removeAll { it.key == c.key } },
                     modifier = Modifier.fillMaxWidth(),
@@ -452,12 +513,18 @@ private fun CustomerSection(g: GameState) {
                         OutlinedButton(
                             onClick = {
                                 val p = min(c.ask, roundTo50(c.offer * (1.0 + pct / 100.0)))
+                                c.myLine = when (pct) {
+                                    5 -> "Tá muito bem cuidado. Dá pra chegar em ${brl(p)}?"
+                                    10 -> "Olha o estado dele! Por ${brl(p)} a gente fecha agora."
+                                    else -> "Última cartada: ${brl(p)} e levo você pra tomar um café!"
+                                }
+                                c.round++
                                 if (p <= c.limit) {
                                     closeDeal(g, c, p)
                                     custs.removeAll { it.key == c.key }
                                 } else if (p <= c.limit * 1.08) {
                                     c.offer = max(c.offer, roundTo50(c.limit * 0.97))
-                                    c.msg = "Tá puxado... chego em ${brl(c.offer)}."
+                                    c.msg = "Hmm, tá puxado... chego em ${brl(c.offer)}, não passo disso."
                                 } else {
                                     g.message = "${c.who} achou caro e foi embora 😒"
                                     custs.remove(c)

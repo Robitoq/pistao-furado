@@ -1002,7 +1002,19 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     val cimg = spr.cars[csi]
                     val ctint = Color(PAINTS[dcar.color].second).copy(alpha = 0.35f)
                     val laneY = if (face < 0) 148f else 133f
-                    sp(cimg, px - cimg.width * 1.1f / 2f, laneY, cam, s, 1.1f, face < 0, ctint, 1f, csi, odo / 4.5f, look)
+                    val ck = 1.1f
+                    val cshape = shapeFor(CATALOG[dcar.model].body)
+                    val cpaint = Color(PAINTS[dcar.color.coerceIn(0, PAINTS.lastIndex)].second)
+                    val cseed = CATALOG[dcar.model].body.ordinal * 17 + dcar.color * 5 + 3
+                    val left = (px - 31f * ck - cam) * s
+                    val topY = laneY * s - 22.5f * ck * s
+                    withTransform({
+                        if (face < 0) scale(-1f, 1f, Offset((px - cam) * s, topY))
+                        translate(left, topY)
+                        scale(ck * s, ck * s, Offset.Zero)
+                    }) {
+                        drawCarUnits(cshape, cseed, cpaint, dcar.tuning, dcar.cond, t, look)
+                    }
                 } else {
                     drawChar(look, (px - 6f - cam) * s, (115f - 26f) * s, s, face < 0, if (moving) 1f else 0f,
                         t * (if (run) 16f else 10f))

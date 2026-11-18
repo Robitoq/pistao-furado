@@ -257,7 +257,7 @@ fun CarArt(
     }
 }
 
-private fun DrawScope.drawCarUnits(
+fun DrawScope.drawCarUnits(
     sh: CarShape, seed: Int, paint: Color, tuning: List<String>, cond: List<Int>, t: Float, driver: Look?,
 ) {
     fun part(i: Int) = cond.getOrElse(i) { 100 }
@@ -465,13 +465,22 @@ private fun DrawScope.drawCarUnits(
                 drawRect(Color(0xFF1B1B1B), Offset(-2.2f, 15.2f), Size(5f, 2.9f))
             }
             if ("aerofolio" in tuning) {
-                val d = sh.deckY
-                drawRect(Color(0xFF1B1B1B), Offset(1.4f, d - 1.6f), Size(1.1f, 1.8f))
-                drawRect(Color(0xFF1B1B1B), Offset(8f, d - 1.6f), Size(1.1f, 1.8f))
-                drawRect(Color(0xFF111111), Offset(-1.8f, d - 4.2f), Size(11.8f, 2.4f))
-                drawRect(Color(0xFF616161), Offset(-1.8f, d - 4.2f), Size(11.8f, 0.6f))
-                drawRect(Color(0xFFE53935), Offset(-1.8f, d - 4.6f), Size(0.9f, 3.2f))
-                drawRect(Color(0xFFE53935), Offset(9.1f, d - 4.6f), Size(0.9f, 3.2f))
+                // asa presa na tampa do porta-malas: dois suportes + prancha com laterais
+                val d = sh.deckY + dy
+                val bx = sh.body[4]
+                val wy = d - 3.6f
+                val x0 = bx - 3.4f
+                val x1 = bx + 5.6f
+                drawRect(Color(0xFF15161A), Offset(bx - 0.4f, wy + 1.4f), Size(1f, d - wy - 1.2f))
+                drawRect(Color(0xFF15161A), Offset(bx + 3.6f, wy + 1.4f), Size(1f, d - wy - 1.2f))
+                val wing = Path().apply {
+                    moveTo(x0, wy + 1.4f); lineTo(x0 + 0.6f, wy); lineTo(x1, wy)
+                    lineTo(x1 + 0.4f, wy + 1.4f); close()
+                }
+                drawPath(wing, Color(0xFF1B1B1B))
+                drawRect(Color(0xFF6B6F76), Offset(x0 + 0.6f, wy), Size(x1 - x0 - 0.6f, 0.45f))
+                drawRect(paintC, Offset(x0 - 0.1f, wy - 0.7f), Size(0.8f, 2.4f))
+                drawRect(paintC, Offset(x1 - 0.3f, wy - 0.7f), Size(0.8f, 2.4f))
             }
             if ("escape" in tuning || "turbo" in tuning) {
                 drawRect(Color(0xFFB0BEC5), Offset(-2.6f, 16.3f), Size(3.4f, 1.5f))
