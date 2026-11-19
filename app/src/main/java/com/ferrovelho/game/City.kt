@@ -524,10 +524,10 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     val city = remember(spr) { genCity(spr) }
     val lamps = remember(city) { city.filter { it.kind == 2 }.map { it.x } }
     val peds = remember {
-        List(34) { val r = Random(it + 5); Ped(randomLook(r), r.nextFloat() * WORLD, r.nextFloat() * 6f) }
+        List(80) { val r = Random(it + 5); Ped(randomLook(r), r.nextFloat() * WORLD, r.nextFloat() * 6f) }
     }
     val traffic = remember {
-        List(22) {
+        List(44) {
             val r = Random(it + 40)
             val lane = it % 2
             Traffic(r.nextInt(9), r.nextFloat() * WORLD, (25 + r.nextInt(25)) * (if (lane == 0) 1f else -1f), lane, randomLook(r))

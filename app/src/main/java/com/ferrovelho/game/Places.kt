@@ -41,7 +41,7 @@ import kotlin.random.Random
 // =====================================================================================
 
 const val GARAGE_X = 1000f                       // oficina
-val STORE_X = listOf(760f, 1700f, 3000f)         // padaria, mercadinho, trailer
+val STORE_X = listOf(760f, 1700f, 3000f, 5800f, 8300f, 10800f)   // padaria, mercadinho, trailer + 3 lojas do bairro novo
 
 fun garageOpen(g: GameState): Boolean = g.ownShop || g.minutes in (7 * 60) until (20 * 60)
 
@@ -95,6 +95,40 @@ val STORES: List<Store> by lazy {
             Food("🍟", "Batata frita", 14, 30.0, 0.0),
             Food("🥤", "Refri lata", 6, 3.0, 30.0, 5),
             Food("🍇", "Açaí", 16, 25.0, 20.0, 10, "Gelado e com granola."),
+        ),
+    ),
+    Store(
+        "🥐 Café da Esquina", "CAFÉ DA ESQUINA", STORE_X[3], 7 * 60, 22 * 60, 1.2f,
+        BuyerLook(true, CSKIN[2], CHAIR[4], Color(0xFF8E24AA), Color(0xFF4E342E)),
+        listOf("Bem-vindo ao bairro novo! Café fresquinho.", "Entra, querido! Hoje tem bolo de fubá.", "O que vai querer?"),
+        listOf(
+            Food("☕", "Café coado + papo", 6, 6.0, 14.0, 15, "Senta e conta as novidades do ferro-velho.", chat = true),
+            Food("🥐", "Croissant", 9, 24.0, 0.0),
+            Food("🍰", "Fatia de bolo", 10, 28.0, 0.0),
+            Food("🥪", "Misto quente", 11, 34.0, 0.0),
+            Food("🧃", "Suco natural", 9, 4.0, 38.0),
+        ),
+    ),
+    Store(
+        "🍦 Sorveteria Gelada", "SORVETERIA GELADA", STORE_X[4], 11 * 60, 22 * 60, 1.1f,
+        BuyerLook(false, CSKIN[3], CHAIR[1], Color(0xFF00ACC1), Color(0xFF263238)),
+        listOf("Tá um calorão, hein? Bora de sorvete!", "Chega mais! Tem de todo sabor.", "Qual vai ser, chefe?"),
+        listOf(
+            Food("🍦", "Casquinha", 8, 12.0, 14.0, 10),
+            Food("🍨", "Taça de sorvete", 16, 22.0, 20.0, 15, "Com calda e granulado!"),
+            Food("🥤", "Milkshake", 14, 20.0, 30.0, 10),
+            Food("💧", "Água", 4, 0.0, 40.0, 5, "Geladinha!"),
+        ),
+    ),
+    Store(
+        "🌭 Carrinho do Zé", "CARRINHO DO ZÉ", STORE_X[5], 9 * 60, 24 * 60, 1.0f,
+        BuyerLook(false, CSKIN[4], CHAIR[0], Color(0xFFFB8C00), Color(0xFF212121)),
+        listOf("Fala, doutor! Dogão na chapa!", "Aqui é tradição no bairro, pode confiar.", "Manda o pedido!"),
+        listOf(
+            Food("🌭", "Dogão completo", 14, 40.0, 0.0, 12),
+            Food("🥓", "Espetinho", 10, 26.0, 0.0),
+            Food("🍟", "Porção de fritas", 15, 32.0, 0.0),
+            Food("🥤", "Refri 600ml", 8, 4.0, 38.0, 5),
         ),
     ),
     )
@@ -217,7 +251,7 @@ fun DrawScope.drawStores(open: List<Boolean>, cam: Float, s: Float, t: Float, p:
         val x0 = cx - 42f
         val on = open[i]
         wr(Color(0x33000000), x0, 101f, 84f, 3f, cam, s)
-        when (i) {
+        when (i % 3) {
             0 -> {   // padaria
                 wr(Color(0xFFFFCC80), x0, 56f, 84f, 48f, cam, s)
                 wr(Color(0xFF6D4C41), x0 - 2f, 52f, 88f, 5f, cam, s)
@@ -268,7 +302,7 @@ fun DrawScope.drawStores(open: List<Boolean>, cam: Float, s: Float, t: Float, p:
                 wr(Color.White, cx + 35f, 108f, 11f, 1.5f, cam, s)
             }
         }
-        if (i != 2) {
+        if (i % 3 != 2) {
             wr(Color(0xFF4E342E), x0 + 52f, 78f, 24f, 26f, cam, s)
             wr(Color(0xFFB3E5FC), x0 + 55f, 81f, 18f, 12f, cam, s)
             wr(Color(0xFFFFD54F), x0 + 57f, 96f, 1.5f, 4f, cam, s)
@@ -284,7 +318,7 @@ fun DrawScope.drawStoresLit(open: List<Boolean>, cam: Float, s: Float, night: Fl
         if (cx + 60f < cam || cx - 60f > cam + VIEW_W) return@forEachIndexed
         glow(Offset((cx - cam) * s, 45f * s), 42f * s, Color(0xFFFFEB3B).copy(alpha = 0.18f * night))
         if (open[i]) {
-            val wx = if (i == 2) cx - 20f else cx - 24f
+            val wx = if (i % 3 == 2) cx - 20f else cx - 24f
             glow(Offset((wx - cam) * s, 90f * s), 36f * s, Color(0xFFFFE08A).copy(alpha = 0.38f * night))
             wr(Color(0xFFFFE9A8).copy(alpha = 0.35f * night), wx - 14f, 81f, 30f, 18f, cam, s)
         }

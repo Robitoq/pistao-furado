@@ -179,7 +179,7 @@ fun SleepScene(g: GameState, pname: String, female: Boolean, fromTaxi: Boolean, 
 }
 
 /** Tarifa do táxi (mesma conta dos outros destinos). */
-fun taxiFare(dist: Float): Int = (dist / 25f).toInt().coerceAtLeast(10)
+fun taxiFare(dist: Float): Int = (dist / 25f).toInt().coerceIn(10, 120)
 
 /** Minutos de viagem. */
-fun taxiMinutes(dist: Float): Int = (dist / 12f).toInt().coerceAtLeast(5)
+fun taxiMinutes(dist: Float): Int = (dist / 12f).toInt().coerceIn(5, 90)

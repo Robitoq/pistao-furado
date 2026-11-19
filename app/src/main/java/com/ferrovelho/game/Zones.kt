@@ -22,14 +22,14 @@ import kotlin.math.min
 import kotlin.math.sin
 
 // =====================================================================================
-//  MAPA MAIOR: cidade (0–5000), parque (5000–6700) e praia (6700–8600)
+//  MAPA MAIOR: cidade (0–12000), parque (12000–13700) e praia (13700–15600)
 // =====================================================================================
 
-const val CITY_END = 5000f
-const val BEACH_START = 6700f
-const val WORLD_END = 8600f
-const val PARK_X = 5800f     // fonte do parque
-const val BEACH_X = 7500f    // quiosque da praia
+const val CITY_END = 12000f
+const val BEACH_START = 13700f
+const val WORLD_END = 15600f
+const val PARK_X = 12800f     // fonte do parque
+const val BEACH_X = 14500f    // quiosque da praia
 
 private val FLOWERS = listOf(Color(0xFFEF5350), Color(0xFFFFEE58), Color(0xFFFFFFFF), Color(0xFFAB47BC))
 private val UMBRELLAS = listOf(Color(0xFFE53935), Color(0xFFFDD835), Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFEC407A))
@@ -73,7 +73,7 @@ fun DrawScope.drawZones(cam: Float, s: Float, t: Float, night: Float, skyFrac: F
         cells(a, b, 64f) { k, x0 ->
             val h = hsh(k * 17 + 9)
             val x = x0 + 8f + (h / 100 % 30)
-            if (h % 100 < 62 && abs(x - PARK_X) > 60f && abs(x - (PARK_X + 330f)) > 40f && (x < 5370f || x > 5610f)) {
+            if (h % 100 < 62 && abs(x - PARK_X) > 60f && abs(x - (PARK_X + 330f)) > 40f && (x < CITY_END + 370f || x > CITY_END + 610f)) {
                 wr(Color(0xFF6D4C41), x, 82f, 5f, 26f, cam, s)
                 drawCircle(Color(0xFF2E7D32), 15f * s, Offset((x + 2.5f - cam) * s, 74f * s))
                 drawCircle(Color(0xFF388E3C), 11f * s, Offset((x - 6f - cam) * s, 80f * s))
