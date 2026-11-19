@@ -1165,10 +1165,10 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     if (summaryDlg) SummaryDialog(g) { summaryDlg = false }
     if (driveDlg) CarPickDialog(g, onPick = { driveId = it; driveDlg = false }, onClose = { driveDlg = false })
     if (dragDlg) DragDialog(g, spr) { dragDlg = false }
-    zoneDlg?.let { zi -> ZoneDialog(g, zi) { zoneDlg = null } }
+    zoneDlg?.let { zi -> InteriorDialog(g, if (zi == 0) Room.PARK else Room.BEACH) { zoneDlg = null } }
     lojaDlg?.let { li -> LojaDialog(g, li) { lojaDlg = null } }
     bizDlg?.let { bi -> if (bi == 0 && 0 in g.companies) InteriorDialog(g, Room.SHOP) { bizDlg = null } else CompanyDialog(g, bi) { bizDlg = null } }
-    shopDlg?.let { si -> StoreDialog(g, STORES[si]) { shopDlg = null } }
+    shopDlg?.let { si -> InteriorDialog(g, Room.STORE, storeIdx = si) { shopDlg = null } }
     chatPed?.let { pi -> StreetChat(g, peds[pi].look, pedName(pi), me.name) { chatPed = null } }
     if (homeDlg) {
         InteriorDialog(g, Room.HOME, onSleep = { homeDlg = false; sleepTaxi = false; sleeping = true }) { homeDlg = false }

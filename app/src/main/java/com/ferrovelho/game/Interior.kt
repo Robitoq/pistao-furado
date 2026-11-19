@@ -35,7 +35,7 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 /** Interiores estilo Game Boy: loja de carros, oficina e casa. Tudo ao vivo, com gente andando e comentando. */
-enum class Room { SHOP, WORKSHOP, HOME }
+enum class Room { SHOP, WORKSHOP, HOME, STORE, PARK, BEACH }
 
 private const val GW = 16f
 private const val GH = 12f
@@ -52,6 +52,9 @@ private class Npc(
     var visits = 0
     var slot = -1
     var walking = false
+    var name = ""
+    var wander = false
+    var friend = false
 }
 
 // paleta Game Boy: escuro -> claro, aplicada em cima da cena inteira
@@ -102,9 +105,23 @@ private fun commentFor(g: GameState, c: OwnedCar, rnd: Random): String {
 }
 
 @Composable
-fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: () -> Unit) {
+fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx: Int = 0, onClose: () -> Unit) {
     val ctx = LocalContext.current
-    val myLook = remember { loadProfile(ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE))?.look ?: randomLook(Random(1)) }
+    val prefs = remember { ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE) }
+    val profile = remember { loadProfile(prefs) }
+    val myLook = profile?.look ?: remember { randomLook(Random(1)) }
+    val myName = profile?.name ?: "amigo"
+    var friends by remember { mutableStateOf(loadFriends(prefs)) }
+    var chatNpc by remember { mutableStateOf<Npc?>(null) }
+    var pendNpc by remember { mutableStateOf<Npc?>(null) }
+    var zonePanel by remember { mutableStateOf(false) }
+    var storePanel by remember { mutableStateOf(false) }
+    var callDlg by remember { mutableStateOf(false) }
+    var act by remember { mutableIntStateOf(0) }          // 1 mergulho, 2 sol, 3 vento, 4 banho
+    var actPhase by remember { mutableIntStateOf(0) }
+    var actT by remember { mutableFloatStateOf(0f) }
+    val store = if (room == Room.STORE) STORES[storeIdx] else null
+    val AMBIENT = listOf("Que dia bonito!", "Tá um calorão...", "Será que vai chover?", "Adoro esse lugar.", "Hmm, que fome...", "Me paga um sorvete?")
     val rnd = remember { Random(System.nanoTime()) }
     var gb by remember { mutableStateOf(true) }
     var tick by remember { mutableIntStateOf(0) }
@@ -140,6 +157,21 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
     LaunchedEffect(room, cars.size) {
         npcs.clear()
         if (room == Room.SHOP && shopOpen) repeat(min(2, cars.size)) { spawnCustomer(true) }
+        if (room == Room.PARK || room == Room.BEACH || room == Room.STORE) {
+            val rr = Random(System.nanoTime())
+            val area = if (room == Room.BEACH) 4.8f else 7.4f
+            val fr = friends.filter { it.value >= FRIEND_LVL }.keys.shuffled(rr).take(2)
+            val others = NPC_NAMES.filter { it !in friends.keys }.shuffled(rr).take(if (room == Room.STORE) 2 else 4)
+            (fr + others).forEach { nm ->
+                val n = Npc(randomLook(Random(nm.hashCode())), 2f + rr.nextFloat() * 12f, area + rr.nextFloat() * (11.5f - area))
+                n.name = nm; n.wander = true; n.friend = nm in fr; n.tx = n.x; n.ty = n.y; n.state = 1; n.timer = rr.nextFloat() * 3f
+                npcs.add(n)
+            }
+        }
+        if (room == Room.STORE && store != null) {
+            val c = Npc(randomLook(Random(storeIdx * 7 + 1)), 8f, 4.7f); c.name = "Vendedor"; c.state = 1; c.timer = 1e9f
+            c.line = store.greet.random(); npcs.add(c)
+        }
         if (room == Room.WORKSHOP) {
             val m = Npc(randomLook(Random(77)), 12f, 9f, mechanic = true)
             m.slot = 0; m.tx = slotX(0) + 1.3f; m.ty = slotY(0) + 0.9f; npcs.add(m)
@@ -164,6 +196,8 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
                         if (pending >= 0) {
                             when {
                                 room == Room.HOME && pending == 100 -> homeSub = true
+                                room == Room.STORE && pending == 300 -> storePanel = true
+                                (room == Room.PARK || room == Room.BEACH) && pending == 301 -> zonePanel = true
                                 room == Room.SHOP -> selCar = cars.getOrNull(pending)
                                 room == Room.WORKSHOP -> panel = true
                             }
@@ -176,7 +210,28 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
                         me.walking = true
                     }
                 }
-                if (!closed && me.y > 11.55f && abs(me.x - DOOR_X) < 1.5f) { closed = true; onClose() }
+                val pn = pendNpc
+                if (pn != null) {
+                    val dd = sqrt((pn.x - me.x) * (pn.x - me.x) + (pn.y - me.y) * (pn.y - me.y))
+                    if (dd < 1.7f) { target = null; pendNpc = null; if (pn.name == "Vendedor") storePanel = true else chatNpc = pn; pn.face = if (me.x < pn.x) -1 else 1 }
+                    else target = Offset(pn.x - 1.3f * (if (me.x < pn.x) 1 else -1), pn.y)
+                }
+                if (act != 0) {
+                    if (actPhase == 1 && target == null) { actPhase = 2; actT = 0f }
+                    if (actPhase == 2) {
+                        actT += dt
+                        if (actT > 3.2f) {
+                            when (act) {
+                                1 -> { g.thirst = max(0.0, g.thirst - 5.0); g.spendTime(45); g.message = "Mergulho refrescante! 🌊" }
+                                2 -> { g.spendTime(30); g.message = "Hora de relaxar no sol ☀️" }
+                                3 -> { g.spendTime(20); g.message = "O vento passou. Dá pra voltar a negociar 💨" }
+                                4 -> { g.spendTime(10); g.message = "Banho tomado, novo em folha 🚿" }
+                            }
+                            act = 0; actPhase = 0
+                        }
+                    }
+                }
+                if (!closed && (room == Room.SHOP || room == Room.WORKSHOP || room == Room.HOME || room == Room.STORE) && me.y > 11.55f && abs(me.x - DOOR_X) < 1.5f) { closed = true; onClose() }
                 // NPCs
                 if (room == Room.SHOP && shopOpen && cars.isNotEmpty()) {
                     spawnT -= dt
@@ -186,6 +241,29 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
                 while (it.hasNext()) {
                     val n = it.next()
                     n.walking = false
+                    if (n.wander) {
+                        if (n.state == 1) {
+                            n.timer -= dt
+                            if (n.timer <= 0f) {
+                                n.line = ""
+                                val lo = if (room == Room.BEACH) 4.8f else if (room == Room.HOME) 7f else 7.2f
+                                n.tx = 0.8f + rnd.nextFloat() * 14.4f; n.ty = lo + rnd.nextFloat() * (11.4f - lo); n.state = 0
+                            }
+                        } else {
+                            val dx = n.tx - n.x; val dy = n.ty - n.y
+                            val d = sqrt(dx * dx + dy * dy)
+                            if (d < 0.12f) {
+                                n.state = 1; n.timer = 2.5f + rnd.nextFloat() * 3f
+                                n.line = if (n.friend) "Fala, $myName!" else if (rnd.nextInt(3) == 0) AMBIENT.random(rnd) else ""
+                            } else {
+                                val st = min(d, 2.2f * dt)
+                                n.x += dx / d * st; n.y += dy / d * st
+                                if (abs(dx) > 0.03f) n.face = if (dx < 0) -1 else 1
+                                n.walking = true
+                            }
+                        }
+                        continue
+                    }
                     if (n.state == 0 || n.state == 2) {
                         val dx = n.tx - n.x; val dy = n.ty - n.y
                         val d = sqrt(dx * dx + dy * dy)
@@ -225,13 +303,13 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        when (room) { Room.SHOP -> "🏬 ${g.empName(0)}"; Room.WORKSHOP -> "🔧 ${g.motorsName()}"; else -> "🏠 Minha casa" },
+                        when (room) { Room.SHOP -> "🏬 ${g.empName(0)}"; Room.WORKSHOP -> "🔧 ${g.motorsName()}"; Room.STORE -> store!!.title; Room.PARK -> "🌳 Parque Central"; Room.BEACH -> "🏖️ Praia"; else -> "🏠 Minha casa" },
                         Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.Bold,
                     )
                     TextButton(onClick = { gb = !gb }) { Text(if (gb) "🎮 GB" else "🎨 Cor", fontSize = 12.sp) }
                     TextButton(onClick = onClose) { Text("✖ Sair") }
                 }
-                Text("${g.dateText()}  •  ${brl(g.money)}", fontSize = 11.sp)
+                Text("${g.dateText()}  •  ${brl(g.money)}  •  🍔 ${g.hunger.toInt()}%  🥤 ${g.thirst.toInt()}%  •  👥 ${friends.count { it.value >= FRIEND_LVL }} amigos", fontSize = 11.sp)
                 if (g.message.isNotEmpty()) Text(g.message, Modifier.fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                 Canvas(
                     Modifier.fillMaxWidth().aspectRatio(GW / GH).pointerInput(room, cars.size) {
@@ -239,7 +317,17 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
                             val u = size.width / GW
                             val wx = off.x / u; val wy = off.y / u
                             var hit = -1
-                            if (room == Room.HOME) {
+                            val tn = npcs.filter { it.name.isNotEmpty() && abs(it.x - wx) < 1.2f && wy in (it.y - 2.8f)..(it.y + 0.4f) }.minByOrNull { abs(it.x - wx) }
+                            if (act != 0) return@detectTapGestures
+                            if (tn != null) { pendNpc = tn; pending = -1; return@detectTapGestures }
+                            pendNpc = null
+                            if (room == Room.STORE) {
+                                if (wx in 4.5f..11.5f && wy in 2.4f..6f) { hit = 300; target = Offset(8f, 6.6f) }
+                            } else if (room == Room.PARK) {
+                                if ((wx in 6f..10f && wy in 3.2f..6.6f) || (wx in 12f..15.5f && wy in 3.2f..6.4f)) { hit = 301; target = Offset(wx.coerceIn(6.5f, 14f), 7.4f) }
+                            } else if (room == Room.BEACH) {
+                                if (wx in 11.5f..15.5f && wy in 3.2f..6.8f) { hit = 301; target = Offset(13f, 7.2f) }
+                            } else if (room == Room.HOME) {
                                 if (abs(wx - 3.3f) < 2.3f && wy in 2.8f..6.4f) { hit = 100; target = Offset(5.9f, 6.2f) }
                             } else {
                                 for (i in 0 until (if (room == Room.WORKSHOP) cars.size else cars.size)) {
@@ -249,7 +337,7 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
                                 }
                             }
                             pending = hit
-                            if (hit < 0) target = Offset(wx.coerceIn(0.8f, 15.2f), wy.coerceIn(if (room == Room.HOME) 5.2f else 7.0f, 11.9f))
+                            if (hit < 0) target = Offset(wx.coerceIn(0.8f, 15.2f), wy.coerceIn(if (room == Room.HOME) 5.2f else if (room == Room.BEACH) 4.8f else 7.0f, 11.9f))
                         }
                     },
                 ) {
@@ -258,7 +346,7 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
                     drawIntoCanvas { cv ->
                         val layer = androidx.compose.ui.graphics.Paint().apply { if (gb) colorFilter = ColorFilter.colorMatrix(GB_MATRIX) }
                         cv.saveLayer(Rect(0f, 0f, size.width, size.height), layer)
-                        drawRoom(g, room, u, time, cars.size)
+                        drawRoom(g, room, u, time, cars.size, store?.sign ?: "")
                         // coisas ordenadas por profundidade (y)
                         val items = mutableListOf<Pair<Float, () -> Unit>>()
                         val ku = u * 5.2f / 62f
@@ -291,10 +379,38 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
                             }
                         })
                         npcs.forEach { person(it) }
-                        person(me)
+                        if (act != 0 && actPhase == 2) {
+                            val bob = sin(time * 4f) * 0.15f
+                            when (act) {
+                                1 -> items.add(me.y to {
+                                    drawChar(myLook, (me.x - 6f * cu / u) * u, (me.y + bob) * u - 24.8f * cu, cu, me.face < 0, 1f, time * 6f)
+                                    drawRect(Color(0xAA3FA9F5), Offset((me.x - 1.3f) * u, (me.y - 1.2f + bob) * u), Size(2.6f * u, 1.5f * u))
+                                })
+                                2 -> items.add(me.y to {
+                                    drawRect(Color(0xFFE53935), Offset((me.x - 2f) * u, (me.y - 0.9f) * u), Size(4f * u, 1.1f * u))
+                                    drawRect(Color(0xFFFFFFFF), Offset((me.x - 2f) * u, (me.y - 0.55f) * u), Size(4f * u, 0.2f * u))
+                                    drawCircle(Color(CSKIN[myLook.skin].value), 0.45f * u, Offset((me.x + 2.2f) * u, (me.y - 0.5f) * u))
+                                    drawRect(Color(CTOP[myLook.top].value), Offset((me.x - 1.2f) * u, (me.y - 0.8f) * u), Size(2.4f * u, 0.55f * u))
+                                    drawCircle(Color(0xFFFFEB3B), 0.55f * u, Offset((me.x - 2.5f) * u, (me.y - 3.4f) * u))
+                                })
+                                3 -> items.add(me.y to {
+                                    drawChar(myLook, (me.x - 6f * cu / u) * u + sin(time * 12f) * u * 0.08f, me.y * u - 24.8f * cu, cu, false, 0f, time * 3f)
+                                })
+                                4 -> items.add(me.y to {
+                                    drawChar(myLook, (me.x - 6f * cu / u) * u, me.y * u - 24.8f * cu, cu, me.face < 0, 0f, 0f)
+                                    for (k in 0 until 6) drawRect(Color(0xCC4FC3F7), Offset((me.x - 1f + k * 0.4f) * u, ((me.y - 3.4f) + ((time * 5f + k * 0.37f) % 1f) * 3f) * u), Size(0.1f * u, 0.45f * u))
+                                })
+                            }
+                        } else person(me)
+                        if (act == 3 && actPhase == 2) for (k in 0 until 9) {
+                            val yy = (4.5f + k * 0.85f) * u; val xx = (((time * 9f + k * 2.3f) % 18f) - 1f) * u
+                            drawRect(Color(0xCCFFFFFF), Offset(xx, yy), Size(2.2f * u, 0.07f * u))
+                        }
                         items.sortBy { it.first }
                         items.forEach { it.second() }
                         // balões por cima de tudo
+                        if (act != 0 && actPhase == 2) tag(when (act) { 1 -> "Que água gelada!"; 2 -> "Ahh, que sol bom..."; 3 -> "Esperando o vento passar..."; else -> "Banho quentinho!" }, me.x * u, (me.y - 2.8f) * u, u * 0.46f, Color.White, Color.Black, Color.Black)
+                        npcs.filter { it.friend && it.line.isEmpty() }.forEach { n -> tag("⭐" + n.name, n.x * u, (n.y - 2.6f) * u, u * 0.4f, Color(0xFFFFF9C4), Color.Black, Color.Black) }
                         npcs.forEach { n ->
                             if (n.state == 1 && n.line.isNotEmpty()) tag(n.line, n.x * u, (n.y - 2.7f) * u, u * 0.46f, Color.White, Color.Black, Color.Black)
                         }
@@ -304,9 +420,22 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
                 val hint = when (room) {
                     Room.SHOP -> if (cars.isEmpty()) "Nenhum carro à venda. Ponha carros da garagem à venda no escritório." else if (!shopOpen) "Fechado (8h às 20h). Os clientes voltam no horário." else "Toque no chão pra andar • toque num carro pra mudar o preço • saia pelo tapete da porta."
                     Room.WORKSHOP -> "Toque num carro seu pra ir até ele e consertar (de graça) • saia pelo tapete da porta."
-                    else -> "Toque na cama pra dormir • saia pelo tapete da porta."
+                    Room.STORE -> "Toque no balcão pra falar com o vendedor • toque nas pessoas pra conversar • saia pelo tapete."
+                    Room.PARK -> "Toque na fonte ou no carrinho de pipoca • toque nas pessoas pra conversar e fazer amigos."
+                    Room.BEACH -> "Toque no quiosque • toque nas pessoas pra conversar • ou use os botões abaixo."
+                    else -> "Toque na cama pra dormir • toque numa pessoa pra conversar • saia pelo tapete da porta."
                 }
                 Text(hint, fontSize = 12.sp)
+                if (room == Room.BEACH) {
+                    fun go(a: Int, x: Float, y: Float) { if (act == 0) { act = a; actPhase = 1; target = Offset(x, y); pending = -1; pendNpc = null } }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(onClick = { go(1, 8f, 5.1f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("🌊 Mergulho", fontSize = 11.sp) }
+                        OutlinedButton(onClick = { go(2, 4.5f, 9f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("☀️ Sol", fontSize = 11.sp) }
+                        OutlinedButton(onClick = { go(3, 8f, 8f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("💨 Vento", fontSize = 11.sp) }
+                        OutlinedButton(onClick = { go(4, 10.4f, 7.6f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("🚿 Banho", fontSize = 11.sp) }
+                    }
+                }
+                if (room == Room.HOME && friends.any { it.value >= FRIEND_LVL }) OutlinedButton(onClick = { callDlg = true }, Modifier.fillMaxWidth()) { Text("📞 Chamar um amigo pra vir aqui") }
                 if (room == Room.SHOP) Button(onClick = { panel = true }, Modifier.fillMaxWidth()) { Text("📋 Escritório / atender clientes") }
                 if (room == Room.WORKSHOP) Button(onClick = { panel = true }, Modifier.fillMaxWidth()) { Text("🔧 Abrir painel da oficina") }
             }
@@ -330,12 +459,34 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, onClose: 
     if (panel) {
         if (room == Room.SHOP) CompanyDialog(g, 0) { panel = false } else WorkshopDialog(g) { panel = false }
     }
+    chatNpc?.let { n ->
+        FriendChat(g, n.name, friends[n.name] ?: 0, myName, onLevel = { lv -> friends = friends + (n.name to lv); saveFriends(prefs, friends); n.friend = lv >= FRIEND_LVL }, onClose = { chatNpc = null })
+    }
+    if (zonePanel) ZoneDialog(g, if (room == Room.PARK) 0 else 1) { zonePanel = false }
+    if (storePanel && store != null) StoreDialog(g, store) { storePanel = false }
+    if (callDlg) AlertDialog(
+        onDismissRequest = { callDlg = false }, confirmButton = { TextButton(onClick = { callDlg = false }) { Text("Fechar") } },
+        title = { Text("📞 Chamar amigo") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                friends.filter { it.value >= FRIEND_LVL }.keys.forEach { nm ->
+                    OutlinedButton(onClick = {
+                        if (npcs.none { it.name == nm }) {
+                            val n = Npc(randomLook(Random(nm.hashCode())), DOOR_X, 11.8f)
+                            n.name = nm; n.wander = true; n.friend = true; n.tx = 6f; n.ty = 8.5f; n.state = 0; npcs.add(n)
+                        }
+                        g.message = "$nm tá chegando! 🏠"; callDlg = false
+                    }, Modifier.fillMaxWidth()) { Text("⭐ $nm") }
+                }
+            }
+        },
+    )
     if (homeSub) HomeDialog(g, onSleep = { homeSub = false; onSleep() }, onClose = { homeSub = false })
 }
 
 // ------------------------------------------------------------------ cenário
 
-private fun DrawScope.drawRoom(g: GameState, room: Room, u: Float, t: Float, nCars: Int) {
+private fun DrawScope.drawRoom(g: GameState, room: Room, u: Float, t: Float, nCars: Int, sign: String) {
     fun r(c: Long, x: Float, y: Float, w: Float, h: Float) = drawRect(Color(c), Offset(x * u, y * u), Size(w * u + 1f, h * u + 1f))
     when (room) {
         Room.SHOP -> {
@@ -356,6 +507,42 @@ private fun DrawScope.drawRoom(g: GameState, room: Room, u: Float, t: Float, nCa
             for (iy in 4 until 12) for (ix in 0 until 16) r(if ((ix + iy) % 2 == 0) 0xFF8A8F96 else 0xFF7C8189, ix.toFloat(), iy.toFloat(), 1f, 1f)
             for (i in 0 until 6) { r(0xFFFFD600, slotX(i) - 2.7f, slotY(i) + 0.05f, 5.4f, 0.12f) }
             r(0xFFFFD600, 6.8f, 11.4f, 2.4f, 0.6f)
+        }
+        Room.STORE -> {
+            r(0xFFF0E6C8, 0f, 0f, GW, 4.6f); r(0xFFBFA77A, 0f, 4.1f, GW, 0.5f)
+            for (i in 0 until 3) { r(0xFF6D4C41, 0.6f + i * 0.0f, 0.9f, 3.2f, 2.8f).also { }; }
+            listOf(0xFFE53935, 0xFFFDD835, 0xFF43A047, 0xFF1E88E5).forEachIndexed { i, c -> r(c, 0.9f + i * 0.7f, 1.2f, 0.5f, 0.5f); r(c, 0.9f + i * 0.7f, 2.3f, 0.5f, 0.5f) }
+            r(0xFF6D4C41, 12.6f, 0.9f, 3f, 2.8f); listOf(0xFFFB8C00, 0xFF8E24AA, 0xFF00ACC1).forEachIndexed { i, c -> r(c, 12.9f + i * 0.8f, 1.2f, 0.6f, 0.6f); r(c, 12.9f + i * 0.8f, 2.3f, 0.6f, 0.6f) }
+            for (iy in 5 until 12) for (ix in 0 until 16) r(if ((ix + iy) % 2 == 0) 0xFFE2D3B0 else 0xFFD2BF96, ix.toFloat(), iy.toFloat(), 1f, 1f)
+            r(0xFF8D6E63, 4.8f, 4.9f, 6.4f, 1.3f); r(0xFFA1887F, 4.8f, 4.9f, 6.4f, 0.3f)
+            r(0xFFC62828, 6.8f, 11.4f, 2.4f, 0.6f)
+            tag(sign, GW / 2f * u, 0.8f * u, u * 0.5f, Color(0xFFD32F2F), Color.White, Color(0xFF3E2723))
+        }
+        Room.PARK -> {
+            val night = g.minutes < 6 * 60 || g.minutes >= 19 * 60
+            r(if (night) 0xFF14204A else 0xFF9AD7FF, 0f, 0f, GW, 3.2f)
+            r(0xFF4CAF50, 0f, 3.2f, GW, 8.8f)
+            for (k in 0 until 40) r(0xFF43A047, ((k * 37) % 160) / 10f, 3.4f + ((k * 53) % 82) / 10f, 0.15f, 0.3f)
+            r(0xFFD7C49E, 0f, 8.4f, GW, 1.4f)                         // caminho
+            listOf(1.5f, 4.2f, 13.8f).forEach { x -> r(0xFF6D4C41, x - 0.2f, 2.2f, 0.4f, 1.5f); drawCircle(Color(0xFF2E7D32), 1.1f * u, Offset(x * u, 1.8f * u)); drawCircle(Color(0xFF388E3C), 0.8f * u, Offset((x - 0.3f) * u, 1.5f * u)) }
+            drawCircle(Color(0xFF90A4AE), 2.2f * u, Offset(8f * u, 5.2f * u)); drawCircle(Color(0xFF4FC3F7), 1.8f * u, Offset(8f * u, 5.2f * u))
+            r(0xFFB0BEC5, 7.8f, 3.6f, 0.4f, 1.6f); val w = ((t * 3f) % 1f) * 0.5f; r(0xFFE1F5FE, 7.5f, 3.6f + w, 1f, 0.2f)
+            r(0xFF8D6E63, 1.5f, 6.2f, 3f, 0.5f); r(0xFF5D4037, 1.7f, 6.7f, 0.2f, 0.6f); r(0xFF5D4037, 4.1f, 6.7f, 0.2f, 0.6f) // banco
+            r(0xFFEF5350, 12.2f, 4.4f, 3f, 1.8f); r(0xFFFFFFFF, 12.2f, 4.4f, 3f, 0.4f); r(0xFF455A64, 12.5f, 6.2f, 0.3f, 0.5f); r(0xFF455A64, 14.6f, 6.2f, 0.3f, 0.5f)
+            tag("🍿 PIPOCA", 13.7f * u, 4.2f * u, u * 0.4f, Color.White, Color.Black, Color.Black)
+        }
+        Room.BEACH -> {
+            r(0xFF9AD7FF, 0f, 0f, GW, 1.2f)
+            r(0xFF1E88E5, 0f, 1.2f, GW, 3f)
+            for (k in 0 until 7) r(0xFFBBDEFB, ((k * 2.6f + t * 1.4f) % 17f) - 1f, 1.7f + (k % 3) * 0.9f, 1.4f, 0.12f)
+            r(0xFFFFFFFF, 0f, 4.1f + sin(t * 1.5f) * 0.1f, GW, 0.25f)
+            r(0xFFF2D49B, 0f, 4.4f, GW, 7.6f)
+            for (k in 0 until 30) r(0xFFE0BE7C, ((k * 41) % 155) / 10f, 4.8f + ((k * 29) % 70) / 10f, 0.15f, 0.1f)
+            r(0xFFFFFFFF, 3f, 8.4f, 3f, 1.3f); r(0xFFE53935, 3.5f, 8.4f, 0.6f, 1.3f); r(0xFFE53935, 4.8f, 8.4f, 0.6f, 1.3f)   // toalha
+            r(0xFF5D4037, 4.4f, 5.6f, 0.2f, 2.8f); drawCircle(Color(0xFFFDD835), 1.6f * u, Offset(4.5f * u, 5.6f * u)); r(0xFFF2D49B, 2.8f, 5.6f, 3.5f, 0.1f)
+            r(0xFF90A4AE, 10.3f, 4.6f, 0.2f, 2.2f); r(0xFF90A4AE, 10f, 4.6f, 0.9f, 0.15f)   // chuveiro
+            r(0xFF8D6E63, 12f, 4.6f, 3.6f, 2.4f); r(0xFF00ACC1, 11.8f, 4.3f, 4f, 0.5f)       // quiosque
+            tag("🍹 QUIOSQUE", 13.8f * u, 4.2f * u, u * 0.4f, Color.White, Color.Black, Color.Black)
         }
         Room.HOME -> {
             val night = g.minutes < 6 * 60 || g.minutes >= 18 * 60
