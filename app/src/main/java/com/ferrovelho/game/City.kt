@@ -1160,18 +1160,18 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
         YardTalk(g, yi, me.name, me.look.female, first, mask == 31, spr) { talk = null }
     }
     if (meetDlg) CarMeetDialog(g, me.name, me.look) { meetDlg = false }
-    if (garageDlg) WorkshopDialog(g) { garageDlg = false }
+    if (garageDlg) { if (g.ownShop) InteriorDialog(g, Room.WORKSHOP) { garageDlg = false } else WorkshopDialog(g) { garageDlg = false } }
     if (garageListDlg) GarageDialog(g) { garageListDlg = false }
     if (summaryDlg) SummaryDialog(g) { summaryDlg = false }
     if (driveDlg) CarPickDialog(g, onPick = { driveId = it; driveDlg = false }, onClose = { driveDlg = false })
     if (dragDlg) DragDialog(g, spr) { dragDlg = false }
     zoneDlg?.let { zi -> ZoneDialog(g, zi) { zoneDlg = null } }
     lojaDlg?.let { li -> LojaDialog(g, li) { lojaDlg = null } }
-    bizDlg?.let { bi -> CompanyDialog(g, bi) { bizDlg = null } }
+    bizDlg?.let { bi -> if (bi == 0 && 0 in g.companies) InteriorDialog(g, Room.SHOP) { bizDlg = null } else CompanyDialog(g, bi) { bizDlg = null } }
     shopDlg?.let { si -> StoreDialog(g, STORES[si]) { shopDlg = null } }
     chatPed?.let { pi -> StreetChat(g, peds[pi].look, pedName(pi), me.name) { chatPed = null } }
     if (homeDlg) {
-        HomeDialog(g, onSleep = { homeDlg = false; sleepTaxi = false; sleeping = true }, onClose = { homeDlg = false })
+        InteriorDialog(g, Room.HOME, onSleep = { homeDlg = false; sleepTaxi = false; sleeping = true }) { homeDlg = false }
     }
     if (sleeping) {
         SleepScene(g, me.name, me.look.female, sleepTaxi) {

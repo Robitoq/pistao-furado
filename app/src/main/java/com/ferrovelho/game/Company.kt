@@ -368,7 +368,7 @@ private fun BuyLot(g: GameState, idx: Int) {
 }
 
 @Composable
-private fun PriceRow(g: GameState, key: String, suggested: Int) {
+internal fun PriceRow(g: GameState, key: String, suggested: Int) {
     val ask = g.stock[key]
     if (ask == null) {
         Button(onClick = { g.setAsk(key, suggested) }, modifier = Modifier.fillMaxWidth()) {
