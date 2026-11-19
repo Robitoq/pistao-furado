@@ -45,21 +45,21 @@ fun FriendChat(g: GameState, name: String, level: Int, me: String, onLevel: (Int
     Dialog(onDismissRequest = onClose) {
         Card {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text((if (friend) "⭐ " else "🙂 ") + name, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text("Amizade: " + "❤".repeat(level.coerceIn(0, 5)) + "🤍".repeat(5 - level.coerceIn(0, 5)), fontSize = 12.sp)
+                Text((if (friend) "" else "") + name, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("Amizade: " + "".repeat(level.coerceIn(0, 5)) + "".repeat(5 - level.coerceIn(0, 5)), fontSize = 12.sp)
                 Text("“$line”", fontSize = 14.sp)
                 if (g.message.isNotEmpty()) Text(g.message, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                 OutlinedButton(onClick = {
                     g.spendTime(10); say(TALK.random())
                     val n = min(5, level + 1); onLevel(n)
-                    g.message = if (n >= FRIEND_LVL && !friend) "Vocês agora são amigos! 🎉" else "Vocês conversaram um pouco."
-                }, Modifier.fillMaxWidth()) { Text("💬 Conversar (10 min)") }
+                    g.message = if (n >= FRIEND_LVL && !friend) "Vocês agora são amigos!" else "Vocês conversaram um pouco."
+                }, Modifier.fillMaxWidth()) { Text("Conversar (10 min)") }
                 OutlinedButton(onClick = {
                     g.money -= 10; g.spendTime(15); g.thirst = min(100.0, g.thirst + 20.0)
                     val n = min(5, level + 2); onLevel(n); say("Valeu pelo refri, $me! Você é gente boa.")
-                    g.message = if (n >= FRIEND_LVL && !friend) "Vocês agora são amigos! 🎉" else "Você pagou um refri 🥤"
-                }, Modifier.fillMaxWidth(), enabled = g.money >= 10) { Text("🥤 Pagar um refri · ${brl(10)}") }
-                if (friend) OutlinedButton(onClick = { say(TIPS.random()); g.message = "" }, Modifier.fillMaxWidth()) { Text("💡 Pedir uma dica de negócio") }
+                    g.message = if (n >= FRIEND_LVL && !friend) "Vocês agora são amigos!" else "Você pagou um refri"
+                }, Modifier.fillMaxWidth(), enabled = g.money >= 10) { Text("Pagar um refri · ${brl(10)}") }
+                if (friend) OutlinedButton(onClick = { say(TIPS.random()); g.message = "" }, Modifier.fillMaxWidth()) { Text("Pedir uma dica de negócio") }
                 TextButton(onClick = onClose) { Text("Tchau") }
             }
         }

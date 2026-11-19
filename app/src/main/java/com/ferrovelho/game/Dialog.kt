@@ -138,7 +138,7 @@ fun BuyerDialog(h: Haggle, invested: Int, onSell: (Int) -> Unit, onClose: () -> 
                         Text(h.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Text(h.type, fontSize = 11.sp)
                         Surface(shape = RoundedCornerShape(12.dp), tonalElevation = 6.dp) {
-                            Text("💬 " + h.line, Modifier.padding(10.dp), fontSize = 14.sp)
+                            Text("" + h.line, Modifier.padding(10.dp), fontSize = 14.sp)
                         }
                         if (h.said.isNotEmpty()) Text(h.said, fontSize = 12.sp)
                     }

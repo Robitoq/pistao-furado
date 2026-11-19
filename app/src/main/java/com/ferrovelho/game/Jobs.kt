@@ -56,10 +56,10 @@ fun JobsDialog(g: GameState, onClose: () -> Unit) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("💼 Trabalhos", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    TextButton(onClick = onClose) { Text("✖ Sair") }
+                    Text("Trabalhos", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = onClose) { Text("Sair") }
                 }
-                Text("${g.dateText()}  •  ${brl(g.money)}  •  🍔 ${g.hunger.toInt()}%  🥤 ${g.thirst.toInt()}%", fontSize = 12.sp)
+                Text("${g.dateText()} • ${brl(g.money)} • ${g.hunger.toInt()}% ${g.thirst.toInt()}%", fontSize = 12.sp)
                 val job = sel
                 if (job == null) {
                     if (result.isNotEmpty()) Text(result, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)

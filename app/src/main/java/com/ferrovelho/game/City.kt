@@ -48,7 +48,7 @@ const val VIEW_W = 190f
 private val YARD_X = listOf(520f, 1450f, 2450f, 3500f, 4450f)
 private const val HOME_X = 260f     // casa do personagem
 private const val MEET_X = 2000f    // encontro de carros
-private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X + COMPANY_X + LOJA_X + DRAG_X + PROP_X
+private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X + COMPANY_X + LOJA_X + DRAG_X + PROP_X + CLUB_X
 private val PLACE_X = YARD_X + NEW_PLACES
 
 val CSKIN = listOf(0xFFFFDBB4, 0xFFF1C27D, 0xFFE0AC69, 0xFFC68642, 0xFF8D5524, 0xFF6B4423, 0xFF4A2C17).map { Color(it) }
@@ -554,8 +554,11 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var garageListDlg by remember { mutableStateOf(false) }
     var summaryDlg by remember { mutableStateOf(false) }
     var jobDlg by remember { mutableStateOf(false) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var ownedProps by remember { mutableStateOf(loadProps(ctx)) }
     var propDlg by remember { mutableStateOf<Int?>(null) }
+    var clubInside by remember { mutableStateOf(false) }
+    val nearClub by remember { derivedStateOf { abs(px - CLUB_X) < 55f } }
     var propInside by remember { mutableStateOf<Int?>(null) }
     var wakeX by remember { mutableFloatStateOf(HOME_X + 30f) }
     val nearProp by remember { derivedStateOf { PROP_X.indexOfFirst { abs(px - it) < 45f } } }
@@ -591,7 +594,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || jobDlg || propDlg != null || propInside != null || bizDlg != null || shopDlg != null || chatPed != null
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || jobDlg || propDlg != null || clubInside || propInside != null || bizDlg != null || shopDlg != null || chatPed != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -936,6 +939,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 drawGarageShop(g.ownShop, garageOpen(g), cam, s, t, paint)
                 drawStores(storesOpen, cam, s, t, paint)
                 drawProps(ownedProps, cam, s, t, paint)
+                drawClub(clubOpen(g.minutes), cam, s, t, paint)
                 drawCompanies(g, cam, s, t, paint)
                 drawLojas(g, cam, s, t, paint)
                 drawDragStrip(cam, s, t, paint)
@@ -1124,42 +1128,48 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         talk = near to first
                     }) { Text("Entrar", fontSize = 13.sp) }
                 } else if (nearMeet) {
-                    Button(onClick = { meetDlg = true }) { Text("🏁 Encontro de carros", fontSize = 13.sp) }
+                    Button(onClick = { meetDlg = true }) { Text("Encontro de carros", fontSize = 13.sp) }
                 } else if (nearHome) {
-                    Button(onClick = { homeDlg = true }) { Text("🏠 Entrar em casa", fontSize = 13.sp) }
+                    Button(onClick = { homeDlg = true }) { Text("Entrar em casa", fontSize = 13.sp) }
                 } else if (nearGarage) {
-                    Button(onClick = { garageDlg = true }) { Text(if (g.ownShop) "🏢 ${g.motorsName()}" else "🔧 Entrar na oficina", fontSize = 13.sp) }
+                    Button(onClick = { garageDlg = true }) { Text(if (g.ownShop) "${g.motorsName()}" else "Entrar na oficina", fontSize = 13.sp) }
                 } else if (nearZone >= 0) {
-                    Button(onClick = { zoneDlg = nearZone }) { Text(if (nearZone == 0) "🌳 Parque Central" else "🏖️ Quiosque da Praia", fontSize = 13.sp) }
+                    Button(onClick = { zoneDlg = nearZone }) { Text(if (nearZone == 0) "Parque Central" else "Quiosque da Praia", fontSize = 13.sp) }
                 } else if (nearDrag) {
-                    Button(onClick = { dragDlg = true }) { Text("🏁 Pista de Arrancada", fontSize = 13.sp) }
+                    Button(onClick = { dragDlg = true }) { Text("Pista de Arrancada", fontSize = 13.sp) }
                 } else if (nearLoja >= 0) {
                     Button(onClick = { lojaDlg = nearLoja }) { Text(lojaLabel(g, nearLoja), fontSize = 13.sp) }
                 } else if (nearBiz >= 0) {
                     Button(onClick = { bizDlg = nearBiz }) {
-                        Text(if (nearBiz in g.companies) "${COMPANY_ICONS[nearBiz]} ${g.empName(nearBiz)}" else "📍 Terreno à venda", fontSize = 13.sp)
+                        Text(if (nearBiz in g.companies) "${COMPANY_ICONS[nearBiz]} ${g.empName(nearBiz)}" else "Terreno à venda", fontSize = 13.sp)
                     }
                 } else if (nearStore >= 0) {
-                    Button(onClick = { shopDlg = nearStore }) { Text(STORES[nearStore].title.substringBefore(" ") + " Entrar", fontSize = 13.sp) }
+                    Button(onClick = { shopDlg = nearStore }) { Text("Entrar: " + STORES[nearStore].title, fontSize = 13.sp) }
+                } else if (nearClub) {
+                    Button(onClick = {
+                        if (!clubOpen(g.minutes)) g.message = "O baile abre às 20h."
+                        else if (g.money < CLUB_FEE) g.message = "Ingresso: ${brl(CLUB_FEE)}. Falta dinheiro."
+                        else { g.money -= CLUB_FEE; clubInside = true }
+                    }) { Text(if (clubOpen(g.minutes)) "Entrar no baile · ${brl(CLUB_FEE)}" else "Baile (abre às 20h)", fontSize = 13.sp) }
                 } else if (nearProp >= 0) {
-                    Button(onClick = { propDlg = nearProp }) { Text(if (nearProp in ownedProps) "🏢 ${PROPS[nearProp].name}" else "🏢 Imóvel à venda", fontSize = 13.sp) }
+                    Button(onClick = { propDlg = nearProp }) { Text(if (nearProp in ownedProps) "${PROPS[nearProp].name}" else "Imóvel à venda", fontSize = 13.sp) }
                 } else if (nearPed >= 0) {
-                    Button(onClick = { chatPed = nearPed }) { Text("💬 Conversar com ${pedName(nearPed)}", fontSize = 13.sp) }
+                    Button(onClick = { chatPed = nearPed }) { Text("Conversar com ${pedName(nearPed)}", fontSize = 13.sp) }
                 } else {
-                    Text(if (driveId != null) "🚘 ${(abs(vel) * 0.5f).toInt()} km/h" else "Explore a cidade", fontSize = 12.sp)
+                    Text(if (driveId != null) "${(abs(vel) * 0.5f).toInt()} km/h" else "Explore a cidade", fontSize = 12.sp)
                 }
                 Row {
-                    TextButton(onClick = { if (driveId != null) driveId = null else driveDlg = true }, contentPadding = PaddingValues(6.dp)) { Text(if (driveId != null) "🚶 Descer" else "🚘 Dirigir", fontSize = 12.sp) }
+                    TextButton(onClick = { if (driveId != null) driveId = null else driveDlg = true }, contentPadding = PaddingValues(6.dp)) { Text(if (driveId != null) "Descer" else "Dirigir", fontSize = 12.sp) }
                 }
                 Row {
-                    TextButton(onClick = { garageListDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("🚗 Garagem", fontSize = 12.sp) }
-                    TextButton(onClick = { summaryDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("📊 Resumo", fontSize = 12.sp) }
-                    TextButton(onClick = { jobDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("💼 Trabalhar", fontSize = 12.sp) }
+                    TextButton(onClick = { garageListDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("Garagem", fontSize = 12.sp) }
+                    TextButton(onClick = { summaryDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("Resumo", fontSize = 12.sp) }
+                    TextButton(onClick = { jobDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("Trabalhar", fontSize = 12.sp) }
                 }
                 Row {
-                    TextButton(onClick = { taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("🚕 Táxi", fontSize = 12.sp) }
-                    TextButton(onClick = { run = !run }, contentPadding = PaddingValues(6.dp)) { Text(if (run) "🏃 Correndo" else "🚶 Andando", fontSize = 12.sp) }
-                    TextButton(onClick = onEdit, contentPadding = PaddingValues(6.dp)) { Text("🧍 Visual", fontSize = 12.sp) }
+                    TextButton(onClick = { taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("Táxi", fontSize = 12.sp) }
+                    TextButton(onClick = { run = !run }, contentPadding = PaddingValues(6.dp)) { Text(if (run) "Correndo" else "Andando", fontSize = 12.sp) }
+                    TextButton(onClick = onEdit, contentPadding = PaddingValues(6.dp)) { Text("Visual", fontSize = 12.sp) }
                 }
             }
             RoundHold(1, { dir = if (it) 1 else 0 })
@@ -1180,8 +1190,9 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     lojaDlg?.let { li -> LojaDialog(g, li) { lojaDlg = null } }
     bizDlg?.let { bi -> if (bi == 0 && 0 in g.companies) InteriorDialog(g, Room.SHOP) { bizDlg = null } else CompanyDialog(g, bi) { bizDlg = null } }
     shopDlg?.let { si -> InteriorDialog(g, Room.STORE, storeIdx = si) { shopDlg = null } }
+    if (clubInside) InteriorDialog(g, Room.CLUB) { clubInside = false }
     propDlg?.let { pi -> PropDialog(g, pi, ownedProps, onOwned = { ownedProps = it }, onEnter = { propDlg = null; propInside = pi }) { propDlg = null } }
-    propInside?.let { pi -> InteriorDialog(g, Room.HOME, onSleep = { propInside = null; wakeX = PROPS[pi].x; sleepTaxi = false; sleeping = true }, title = "🏢 ${PROPS[pi].name}") { propInside = null } }
+    propInside?.let { pi -> InteriorDialog(g, Room.HOME, onSleep = { propInside = null; wakeX = PROPS[pi].x; sleepTaxi = false; sleeping = true }, title = PROPS[pi].name) { propInside = null } }
     chatPed?.let { pi -> StreetChat(g, peds[pi].look, pedName(pi), me.name) { chatPed = null } }
     if (homeDlg) {
         InteriorDialog(g, Room.HOME, onSleep = { homeDlg = false; wakeX = HOME_X + 30f; sleepTaxi = false; sleeping = true }) { homeDlg = false }
@@ -1200,9 +1211,9 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
         Dialog(onDismissRequest = { lateAsk = false }) {
             Card {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("🌙 Já é madrugada!", fontWeight = FontWeight.Bold)
+                    Text("Já é madrugada!", fontWeight = FontWeight.Bold)
                     Text("${me.name} tá morrendo de sono. Melhor chamar um táxi e ir dormir em casa.", fontSize = 13.sp)
-                    Button(onClick = { lateAsk = false; rideHome() }, Modifier.fillMaxWidth()) { Text("🚕 Ir pra casa e dormir") }
+                    Button(onClick = { lateAsk = false; rideHome() }, Modifier.fillMaxWidth()) { Text("Ir pra casa e dormir") }
                     TextButton(onClick = { lateAsk = false }) { Text("Mais um pouquinho") }
                 }
             }
@@ -1212,7 +1223,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
         Dialog(onDismissRequest = { taxi = false }) {
             Card {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("🚕 Táxi - pra onde?", fontWeight = FontWeight.Bold)
+                    Text("Táxi - pra onde?", fontWeight = FontWeight.Bold)
                     YARD_X.forEachIndexed { i, yx ->
                         val dist = abs(px - yx)
                         val fare = (dist / 25f).toInt().coerceAtLeast(10)
@@ -1249,7 +1260,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             taxi = false
                         },
                         Modifier.fillMaxWidth(),
-                    ) { Text("🏁 Encontro de Carros - ${brl(fareM)}", fontSize = 13.sp) }
+                    ) { Text("Encontro de Carros - ${brl(fareM)}", fontSize = 13.sp) }
                     val distG = abs(px - GARAGE_X)
                     val fareG = taxiFare(distG)
                     OutlinedButton(
@@ -1266,7 +1277,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             taxi = false
                         },
                         Modifier.fillMaxWidth(),
-                    ) { Text("🔧 Oficina - ${brl(fareG)}", fontSize = 13.sp) }
+                    ) { Text("Oficina - ${brl(fareG)}", fontSize = 13.sp) }
                     COMPANY_X.forEachIndexed { ci, cxx ->
                         if (ci in g.companies) {
                             val distC = abs(px - cxx)
@@ -1326,7 +1337,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             taxi = false
                         },
                         Modifier.fillMaxWidth(),
-                    ) { Text("🏁 Pista de Arrancada - ${brl(fareD)}", fontSize = 13.sp) }
+                    ) { Text("Pista de Arrancada - ${brl(fareD)}", fontSize = 13.sp) }
                     val distP = abs(px - PARK_X)
                     OutlinedButton(
                         onClick = {
@@ -1343,7 +1354,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             taxi = false
                         },
                         Modifier.fillMaxWidth(),
-                    ) { Text("🌳 Parque Central - ${brl(taxiFare(distP))}", fontSize = 13.sp) }
+                    ) { Text("Parque Central - ${brl(taxiFare(distP))}", fontSize = 13.sp) }
                     val distB = abs(px - BEACH_X)
                     OutlinedButton(
                         onClick = {
@@ -1360,12 +1371,12 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             taxi = false
                         },
                         Modifier.fillMaxWidth(),
-                    ) { Text("🏖️ Praia - ${brl(taxiFare(distB))}", fontSize = 13.sp) }
+                    ) { Text("Praia - ${brl(taxiFare(distB))}", fontSize = 13.sp) }
                     val fareH = taxiFare(abs(px - HOME_X))
                     OutlinedButton(
                         onClick = { taxi = false; rideHome() },
                         Modifier.fillMaxWidth(),
-                    ) { Text((if (g.minutes >= SLEEP_FROM) "🏠 Casa (ir dormir) - " else "🏠 Minha casa - ") + brl(fareH), fontSize = 13.sp) }
+                    ) { Text((if (g.minutes >= SLEEP_FROM) "Casa (ir dormir) -" else "Minha casa -") + brl(fareH), fontSize = 13.sp) }
                     TextButton(onClick = { taxi = false }) { Text("Cancelar") }
                 }
             }
@@ -1574,7 +1585,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, female: Boolean, firs
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PixelPerson(o.look, Modifier.size(48.dp, 84.dp))
                     Column {
-                        Text(o.name + when (mood) { 0 -> "  😠"; 2 -> "  😄"; else -> "  😐" }, fontWeight = FontWeight.Bold)
+                        Text(o.name + when (mood) { 0 -> ""; 2 -> ""; else -> "" }, fontWeight = FontWeight.Bold)
                         Text(speech, fontSize = 14.sp)
                         you?.let { Text("$pname: $it", fontSize = 13.sp, color = Color(0xFF90CAF9)) }
                     }

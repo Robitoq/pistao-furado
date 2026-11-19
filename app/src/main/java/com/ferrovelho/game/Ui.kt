@@ -82,7 +82,7 @@ fun FerroVelhoApp(g: GameState) {
     if (g.bankrupt) {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("🏚️ Você faliu!") },
+            title = { Text("Você faliu!") },
             text = { Text("As dívidas passaram do limite e o banco levou tudo. Você chegou ao dia ${g.day}, com ${g.sold} carros e ${g.hSold} casas vendidas. Dá pra recomeçar do zero.") },
             confirmButton = { TextButton(onClick = { g.newGame() }) { Text("Recomeçar") } },
         )
@@ -105,13 +105,8 @@ private fun TopStatus(g: GameState) {
             var snd by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Music.enabled) }
             val sctx = androidx.compose.ui.platform.LocalContext.current
             Text(
-                if (snd) "🔊" else "🔇", fontSize = 22.sp,
+                if (snd) "Som" else "Mudo", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable { snd = Music.toggle(sctx.applicationContext) }.padding(end = 10.dp),
-            )
-            var vz by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Voice.enabled) }
-            Text(
-                if (vz) "🗣️" else "🤐", fontSize = 22.sp,
-                modifier = Modifier.clickable { vz = Voice.toggle(sctx.applicationContext) }.padding(end = 10.dp),
             )
         }
     }
@@ -217,7 +212,7 @@ fun GarageScreen(g: GameState, onOpen: (Int) -> Unit) {
             }
         }
         if (g.garage.isEmpty()) {
-            item { Text("Garagem vazia. Vai no Ferro Velho comprar um carro! 🚗") }
+            item { Text("Garagem vazia. Vai no Ferro Velho comprar um carro!") }
         }
         items(g.garage, key = { it.id }) { car ->
             val m = CATALOG[car.model]
@@ -274,16 +269,16 @@ fun CarScreen(g: GameState, car: OwnedCar, onCity: () -> Unit, onBack: () -> Uni
             "Conserto, tuning e pintura agora são feitos na oficina, lá na cidade.",
             fontSize = 13.sp,
         )
-        Button(onClick = onCity, modifier = Modifier.fillMaxWidth()) { Text("🏙️ Ir até a oficina") }
+        Button(onClick = onCity, modifier = Modifier.fillMaxWidth()) { Text("Ir até a oficina") }
 
         SectionTitle("💰 Vender")
         Button(
             onClick = {
-                if (g.minutes >= 22 * 60) g.message = "Já é noite, ninguém aparece. Passe pro próximo dia 🌙"
+                if (g.minutes >= 22 * 60) g.message = "Já é noite, ninguém aparece. Passe pro próximo dia"
                 else { g.spendTime(30); haggle = newHaggle(g, car) }
             },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("👥 Atender um comprador") }
+        ) { Text("Atender um comprador") }
         haggle?.let { h ->
             BuyerDialog(h, invested, { p -> g.sell(car.id, Offer(h.type, "", p)); haggle = null }, { haggle = null })
         }
@@ -371,7 +366,7 @@ fun RepairCard(g: GameState, car: OwnedCar, i: Int, name: String) {
                 Box(
                     Modifier.size(40.dp).clip(CircleShape).background(col.copy(alpha = 0.18f)).border(1.5.dp, col, CircleShape),
                     contentAlignment = Alignment.Center,
-                ) { Text(PART_ICONS.getOrElse(i) { "🔧" }, fontSize = 18.sp) }
+                ) { Text(PART_ICONS.getOrElse(i) { "" }, fontSize = 18.sp) }
                 Column(Modifier.weight(1f)) {
                     Text(name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Text(label, color = col, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -400,7 +395,7 @@ fun RepairCard(g: GameState, car: OwnedCar, i: Int, name: String) {
                     ) { Text("100%  ${brl(g.repairCost(car, i, MAX_COND))}", fontSize = 12.sp) }
                 }
             } else {
-                Text("✓ Perfeito", color = GREEN, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("Perfeito", color = GREEN, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -424,9 +419,9 @@ fun TuningCard(g: GameState, car: OwnedCar, t: Tuning, modifier: Modifier) {
             Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center, minLines = 2, maxLines = 2)
             Text("+${(t.valuePct * 100).roundToInt()}% valor", color = accent, fontSize = 11.sp)
             if (has) {
-                Text("✓ Instalado", color = GREEN, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("Instalado", color = GREEN, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             } else if (block != null) {
-                Text("🚫 $block", color = Color(0xFFEF9A9A), fontSize = 11.sp, textAlign = TextAlign.Center)
+                Text("$block", color = Color(0xFFEF9A9A), fontSize = 11.sp, textAlign = TextAlign.Center)
             } else {
                 FilledTonalButton(
                     onClick = { g.install(car.id, t) },

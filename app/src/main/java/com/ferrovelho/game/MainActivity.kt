@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
         if (lastCrash != null) {
             // mostra o erro da última vez que o app fechou, em vez de abrir o jogo
             setContent {
-                MaterialTheme(colorScheme = darkColorScheme()) {
+                GameTheme {
                     Surface(Modifier.fillMaxSize()) {
                         val clip = LocalClipboardManager.current
                         var show by remember { mutableStateOf(true) }
@@ -67,7 +67,7 @@ class MainActivity : ComponentActivity() {
         game = g
         g.load()
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            GameTheme {
                 Surface(Modifier.fillMaxSize()) {
                     FerroVelhoApp(g)
                 }

@@ -59,7 +59,7 @@ class Store(
 val STORES: List<Store> by lazy {
     listOf(
     Store(
-        "🥖 Padaria Pão Quente", "PADARIA PÃO QUENTE", STORE_X[0], 6 * 60, 21 * 60, 1.3f,
+        "Padaria Pão Quente", "PADARIA PÃO QUENTE", STORE_X[0], 6 * 60, 21 * 60, 1.3f,
         BuyerLook(true, CSKIN[4], CHAIR[1], Color.White, Color(0xFF6D4C41)),
         listOf("Bom dia! Pão quentinho saindo!", "Entra, freguês! O café tá fresquinho.", "O que vai ser hoje, querido?"),
         listOf(
@@ -72,7 +72,7 @@ val STORES: List<Store> by lazy {
         ),
     ),
     Store(
-        "🛒 Mercadinho 2 Irmãos", "MERCADINHO 2 IRMÃOS", STORE_X[1], 6 * 60, 23 * 60 + 30, 0.8f,
+        "Mercadinho 2 Irmãos", "MERCADINHO 2 IRMÃOS", STORE_X[1], 6 * 60, 23 * 60 + 30, 0.8f,
         BuyerLook(false, CSKIN[1], CHAIR[5], Color(0xFF43A047), Color(0xFF37474F)),
         listOf("Boa! Precisando de quê?", "Tá tudo baratinho aqui, pode olhar.", "Fala, freguês!"),
         listOf(
@@ -85,7 +85,7 @@ val STORES: List<Store> by lazy {
         ),
     ),
     Store(
-        "🍔 Trailer do Bigode", "TRAILER DO BIGODE", STORE_X[2], 10 * 60, 24 * 60, 0.9f,
+        "Trailer do Bigode", "TRAILER DO BIGODE", STORE_X[2], 10 * 60, 24 * 60, 0.9f,
         BuyerLook(false, CSKIN[3], CHAIR[0], Color(0xFFE53935), Color(0xFF212121)),
         listOf("Fala, campeão! O X-Tudo tá imbatível!", "Chega mais! Tá na chapa agora.", "Quer o quê, patrão?"),
         listOf(
@@ -98,7 +98,7 @@ val STORES: List<Store> by lazy {
         ),
     ),
     Store(
-        "🥐 Café da Esquina", "CAFÉ DA ESQUINA", STORE_X[3], 7 * 60, 22 * 60, 1.2f,
+        "Café da Esquina", "CAFÉ DA ESQUINA", STORE_X[3], 7 * 60, 22 * 60, 1.2f,
         BuyerLook(true, CSKIN[2], CHAIR[4], Color(0xFF8E24AA), Color(0xFF4E342E)),
         listOf("Bem-vindo ao bairro novo! Café fresquinho.", "Entra, querido! Hoje tem bolo de fubá.", "O que vai querer?"),
         listOf(
@@ -110,7 +110,7 @@ val STORES: List<Store> by lazy {
         ),
     ),
     Store(
-        "🍦 Sorveteria Gelada", "SORVETERIA GELADA", STORE_X[4], 11 * 60, 22 * 60, 1.1f,
+        "Sorveteria Gelada", "SORVETERIA GELADA", STORE_X[4], 11 * 60, 22 * 60, 1.1f,
         BuyerLook(false, CSKIN[3], CHAIR[1], Color(0xFF00ACC1), Color(0xFF263238)),
         listOf("Tá um calorão, hein? Bora de sorvete!", "Chega mais! Tem de todo sabor.", "Qual vai ser, chefe?"),
         listOf(
@@ -121,7 +121,7 @@ val STORES: List<Store> by lazy {
         ),
     ),
     Store(
-        "🌭 Carrinho do Zé", "CARRINHO DO ZÉ", STORE_X[5], 9 * 60, 24 * 60, 1.0f,
+        "Carrinho do Zé", "CARRINHO DO ZÉ", STORE_X[5], 9 * 60, 24 * 60, 1.0f,
         BuyerLook(false, CSKIN[4], CHAIR[0], Color(0xFFFB8C00), Color(0xFF212121)),
         listOf("Fala, doutor! Dogão na chapa!", "Aqui é tradição no bairro, pode confiar.", "Manda o pedido!"),
         listOf(
@@ -342,7 +342,7 @@ fun StoreDialog(g: GameState, st: Store, onClose: () -> Unit) {
                     PixelPerson(st.clerk, Modifier.size(48.dp, 84.dp))
                     Text("“$line”", fontSize = 14.sp, modifier = Modifier.weight(1f))
                 }
-                Text("🍔 ${g.hunger.toInt()}%   🥤 ${g.thirst.toInt()}%   •   ${brl(g.money)}", fontSize = 12.sp)
+                Text("${g.hunger.toInt()}%  ${g.thirst.toInt()}%  •  ${brl(g.money)}", fontSize = 12.sp)
                 if (open) {
                     st.items.forEach { f ->
                         OutlinedButton(
@@ -447,7 +447,7 @@ fun StreetChat(g: GameState, look: Look, name: String, me: String, onClose: () -
                         Text("“$line”", fontSize = 14.sp)
                     }
                 }
-                OutlinedButton(onClick = { g.spendTime(5); say(marketTalk(g)) }, Modifier.fillMaxWidth()) { Text("📈 Como tá o mercado de carros?", fontSize = 13.sp) }
+                OutlinedButton(onClick = { g.spendTime(5); say(marketTalk(g)) }, Modifier.fillMaxWidth()) { Text("Como tá o mercado de carros?", fontSize = 13.sp) }
                 OutlinedButton(
                     onClick = {
                         g.spendTime(5)
@@ -455,7 +455,7 @@ fun StreetChat(g: GameState, look: Look, name: String, me: String, onClose: () -
                         else { lastTipDay = g.day; say(yardTip(g)) }
                     },
                     Modifier.fillMaxWidth(),
-                ) { Text("🔎 Sabe de algum carro barato por aí?", fontSize = 13.sp) }
+                ) { Text("Sabe de algum carro barato por aí?", fontSize = 13.sp) }
                 OutlinedButton(
                     onClick = {
                         g.spendTime(5)
@@ -464,7 +464,7 @@ fun StreetChat(g: GameState, look: Look, name: String, me: String, onClose: () -
                         say(pool.random())
                     },
                     Modifier.fillMaxWidth(),
-                ) { Text("💬 Bater um papo", fontSize = 13.sp) }
+                ) { Text("Bater um papo", fontSize = 13.sp) }
                 TextButton(onClick = onClose, Modifier.align(Alignment.CenterHorizontally)) { Text("Até mais!") }
             }
         }
@@ -483,10 +483,10 @@ fun WorkshopDialog(g: GameState, onClose: () -> Unit) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (g.ownShop) "🏢 ${g.motorsName()}" else "🔧 Oficina do Tião", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(if (g.ownShop) "${g.motorsName()}" else "Oficina do Tião", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text("${g.dateText()}  •  ${brl(g.money)}", fontSize = 11.sp)
                     }
-                    TextButton(onClick = onClose) { Text("✖ Sair") }
+                    TextButton(onClick = onClose) { Text("Sair") }
                 }
                 if (!open) {
                     Text("A oficina está fechada. Abre das 7h às 20h.\nMonte sua própria empresa pra ter oficina 24h!", fontSize = 14.sp)
@@ -544,7 +544,7 @@ private fun ColumnScope.WorkshopBody(g: GameState) {
         if (tab == 3) {
             CompanyTab(g)
         } else if (car == null) {
-            Text("Você não tem carro na garagem. Compre um no ferro velho e traga aqui! 🚗", fontSize = 14.sp)
+            Text("Você não tem carro na garagem. Compre um no ferro velho e traga aqui!", fontSize = 14.sp)
         } else when (tab) {
             0 -> {
                 Text("Conserte na mão (minigame): as peças custam metade do preço, mas se errar a peça é perdida.", fontSize = 12.sp)
@@ -552,13 +552,13 @@ private fun ColumnScope.WorkshopBody(g: GameState) {
                     RepairCard(g, car, i, name)
                     if (car.cond[i] < MAX_COND) {
                         OutlinedButton(onClick = { game = i }, Modifier.fillMaxWidth()) {
-                            Text("🎮 Consertar na mão · peças ${brl(g.mechanicCost(car, i))}/tentativa", fontSize = 12.sp)
+                            Text("Consertar na mão · peças ${brl(g.mechanicCost(car, i))}/tentativa", fontSize = 12.sp)
                         }
                     }
                 }
                 if (car.cond.any { it < MAX_COND }) {
                     Button(onClick = { g.repairAll(car.id) }, Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
-                        Text("🛠️ Mandar o Tião reparar tudo · ${if (g.ownShop) "GRÁTIS" else brl(g.repairAllCost(car))}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Mandar o Tião reparar tudo · ${if (g.ownShop)"GRÁTIS" else brl(g.repairAllCost(car))}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
@@ -595,19 +595,19 @@ private fun ColumnScope.WorkshopBody(g: GameState) {
 @Composable
 private fun CompanyTab(g: GameState) {
     if (g.ownShop) {
-        Text("🏢 ${g.motorsName()} — sua empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text("${g.motorsName()} — sua empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         RenameButton(g, "o", g.motorsName())
         Text("• Oficina aberta 24 horas\n• peças, tuning e pintura de graça pra você\n• Rende dinheiro todo dia com serviços de clientes", fontSize = 13.sp)
         Text("Carros vendidos: ${g.sold}\nLucro total: ${brl(g.totalProfit)}", fontSize = 13.sp)
     } else {
-        Text("🏗️ Montar minha própria empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text("Montar minha própria empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text(
             "Chega de pagar oficina dos outros. Compre, conserte e revenda com a sua marca:\n" +
                 "• Placa nova: Ferrovelho Motors\n• Oficina aberta 24 horas\n• peças, tuning e pintura de graça pra você\n• Renda extra todo dia com serviços de clientes",
             fontSize = 13.sp,
         )
         Button(onClick = { g.buildShop() }, enabled = g.money >= SHOP_COST, modifier = Modifier.fillMaxWidth().height(50.dp)) {
-            Text("🏗️ Construir · ${brl(SHOP_COST)}", fontWeight = FontWeight.Bold)
+            Text("Construir · ${brl(SHOP_COST)}", fontWeight = FontWeight.Bold)
         }
         if (g.money < SHOP_COST) Text("Faltam ${brl(SHOP_COST - g.money)}.", fontSize = 12.sp, color = Color(0xFFEF5350))
     }
@@ -663,7 +663,7 @@ fun RepairMinigame(g: GameState, carId: Int, part: Int, onClose: () -> Unit) {
                             }
                         },
                         Modifier.fillMaxWidth().height(56.dp),
-                    ) { Text("🔧 APERTAR!", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                    ) { Text("APERTAR!", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                     Text("Peças: ${brl(g.mechanicCost(car, part))} por tentativa", fontSize = 11.sp)
                 } else {
                     Text(if (gained > 0) "Você recuperou +$gained pontos em ${PART_NAMES[part]}!" else "Dessa vez não deu. Tenta de novo!", fontSize = 13.sp, textAlign = TextAlign.Center)

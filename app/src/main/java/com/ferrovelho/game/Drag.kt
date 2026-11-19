@@ -119,7 +119,7 @@ fun CarPickDialog(g: GameState, onPick: (Int) -> Unit, onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose) {
         Card {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("🚘 Qual carro vai dirigir?", fontWeight = FontWeight.Bold)
+                Text("Qual carro vai dirigir?", fontWeight = FontWeight.Bold)
                 if (g.garage.isEmpty()) Text("Sua garagem está vazia. Compre um carro num ferro-velho primeiro.", fontSize = 13.sp)
                 g.garage.forEach { car ->
                     OutlinedButton(onClick = { onPick(car.id) }, modifier = Modifier.fillMaxWidth()) {
@@ -402,8 +402,8 @@ fun DragDialog(g: GameState, spr: CitySprites, onClose: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🏁 Arrancada • 400 m  •  ${brl(g.money)}", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    if (stage == DragStage.SETUP || stage == DragStage.RESULT) TextButton(onClick = onClose) { Text("✖ Sair") }
+                    Text("Arrancada • 400 m • ${brl(g.money)}", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    if (stage == DragStage.SETUP || stage == DragStage.RESULT) TextButton(onClick = onClose) { Text("Sair") }
                 }
                 when (stage) {
                     DragStage.SETUP -> Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -423,7 +423,7 @@ fun DragDialog(g: GameState, spr: CitySprites, onClose: () -> Unit) {
                             fontSize = 12.sp,
                         )
                         Button(onClick = { startRace() }, enabled = car != null && bet <= g.money, modifier = Modifier.fillMaxWidth().height(50.dp)) {
-                            Text("🏁 LARGAR", fontWeight = FontWeight.Bold)
+                            Text("LARGAR", fontWeight = FontWeight.Bold)
                         }
                         if (g.message.isNotEmpty()) Text(g.message, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                     }
@@ -459,7 +459,7 @@ fun DragDialog(g: GameState, spr: CitySprites, onClose: () -> Unit) {
                                         detectTapGestures(onPress = { gas = true; tryAwaitRelease(); gas = false })
                                     },
                                 contentAlignment = Alignment.Center,
-                            ) { Text("⛽ ACELERAR\n(segure)", textAlign = TextAlign.Center, fontWeight = FontWeight.Bold) }
+                            ) { Text("ACELERAR\n(segure)", textAlign = TextAlign.Center, fontWeight = FontWeight.Bold) }
                             Box(
                                 Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(16.dp))
                                     .background(Color(0xFF6A1B9A))
@@ -481,7 +481,7 @@ fun DragDialog(g: GameState, spr: CitySprites, onClose: () -> Unit) {
                     DragStage.RESULT -> Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         RaceScene(spr, car, myT, dist, oppT, opp2T, 0, false, 0f, false, 0f)
                         val place = 1 + (if (oppT < myT) 1 else 0) + (if (opp2T < myT) 1 else 0)
-                        Text(if (won) "🏆 1º lugar! Você venceu!" else "😬 ${place}º lugar...", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text(if (won) "1º lugar! Você venceu!" else "${place}º lugar...", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         Text("Seu tempo: ${"%.2f".format(myT)} s  •  Rival: ${"%.2f".format(oppT)} s  •  3º carro: ${"%.2f".format(opp2T)} s", fontSize = 13.sp)
                         Text(
                             if (bet == 0) "Corrida de treino, sem dinheiro em jogo."
@@ -489,7 +489,7 @@ fun DragDialog(g: GameState, spr: CitySprites, onClose: () -> Unit) {
                             fontSize = 14.sp,
                         )
                         Text("O motor desgastou um pouco (−2%).", fontSize = 12.sp)
-                        Button(onClick = { stage = DragStage.SETUP }, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("🔁 Correr de novo") }
+                        Button(onClick = { stage = DragStage.SETUP }, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Correr de novo") }
                     }
                     else -> {}
                 }

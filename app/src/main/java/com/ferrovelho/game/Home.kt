@@ -62,7 +62,7 @@ fun HomeDialog(g: GameState, onSleep: () -> Unit, onClose: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("🏠 Sua casa", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Sua casa", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Bedroom(night)
                 Text(
                     if (night) "Já é noite. Sua cama tá te chamando..."
@@ -70,12 +70,12 @@ fun HomeDialog(g: GameState, onSleep: () -> Unit, onClose: () -> Unit) {
                     fontSize = 13.sp, textAlign = TextAlign.Center,
                 )
                 if (night) {
-                    Button(onClick = onSleep, Modifier.fillMaxWidth()) { Text("😴 Dormir e acordar amanhã") }
+                    Button(onClick = onSleep, Modifier.fillMaxWidth()) { Text("Dormir e acordar amanhã") }
                 } else {
                     OutlinedButton(
                         onClick = { g.spendTime(SLEEP_FROM - g.minutes) },
                         Modifier.fillMaxWidth(),
-                    ) { Text("⏩ Esperar anoitecer (19h)") }
+                    ) { Text("Esperar anoitecer (19h)") }
                 }
                 TextButton(onClick = onClose) { Text("Sair") }
             }
@@ -153,21 +153,21 @@ fun SleepScene(g: GameState, pname: String, female: Boolean, fromTaxi: Boolean, 
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (step) {
                     0 -> {
-                        Text("🚕", fontSize = 64.sp, modifier = Modifier.alpha(0.6f + 0.4f * pulse))
+                        Text("", fontSize = 64.sp, modifier = Modifier.alpha(0.6f + 0.4f * pulse))
                         Text("Chamando o táxi...", fontSize = 20.sp, color = fg, fontWeight = FontWeight.Bold)
                         Text("Indo pra casa", fontSize = 14.sp, color = fg)
                     }
                     1 -> {
-                        Text("🏠", fontSize = 64.sp)
+                        Text("", fontSize = 64.sp)
                         Text("Chegando em casa...", fontSize = 20.sp, color = fg, fontWeight = FontWeight.Bold)
                     }
                     2 -> {
-                        Text("😴", fontSize = 64.sp)
-                        Text("💤  Zzz...", fontSize = 28.sp, color = fg, modifier = Modifier.alpha(0.35f + 0.65f * pulse))
+                        Text("", fontSize = 64.sp)
+                        Text("Zzz...", fontSize = 28.sp, color = fg, modifier = Modifier.alpha(0.35f + 0.65f * pulse))
                         Text("Dormindo...", fontSize = 14.sp, color = fg)
                     }
                     else -> {
-                        Text("☀️", fontSize = 64.sp)
+                        Text("", fontSize = 64.sp)
                         Text("Bom dia, $pname!", fontSize = 24.sp, color = fg, fontWeight = FontWeight.Bold)
                         Text("Dia ${g.day} • 08:00", fontSize = 14.sp, color = fg)
                         Text("Você dormiu bem. Os ferros-velhos têm carros novos!", fontSize = 13.sp, color = fg, textAlign = TextAlign.Center)

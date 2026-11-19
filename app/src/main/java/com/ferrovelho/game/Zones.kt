@@ -228,33 +228,33 @@ fun ZoneDialog(g: GameState, kind: Int, onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose) {
         Card {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(if (kind == 0) "🌳 Parque Central" else "🏖️ Quiosque da Praia", fontWeight = FontWeight.Bold)
+                Text(if (kind == 0) "Parque Central" else "Quiosque da Praia", fontWeight = FontWeight.Bold)
                 Text("${brl(g.money)}", fontSize = 12.sp)
                 if (g.message.isNotEmpty()) {
                     Text(g.message, Modifier.fillMaxWidth().clickable { g.message = "" }, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                 }
                 if (kind == 0) {
                     ZoneOption(g, "💧 Beber água da fonte (grátis)", 0) {
-                        g.thirst = min(100.0, g.thirst + 25.0); g.spendTime(5); g.message = "Água fresquinha da fonte 💧"
+                        g.thirst = min(100.0, g.thirst + 25.0); g.spendTime(5); g.message = "Água fresquinha da fonte"
                     }
                     ZoneOption(g, "🍿 Pipoca do carrinho · ${brl(8)}", 8) {
-                        g.money -= 8; g.hunger = min(100.0, g.hunger + 12.0); g.spendTime(10); g.message = "Pipoca quentinha 🍿"
+                        g.money -= 8; g.hunger = min(100.0, g.hunger + 12.0); g.spendTime(10); g.message = "Pipoca quentinha"
                     }
                     ZoneOption(g, "🪑 Descansar no banco (30 min)", 0) {
-                        g.spendTime(30); g.message = "Você relaxou um pouco no parque 🌳"
+                        g.spendTime(30); g.message = "Você relaxou um pouco no parque"
                     }
                 } else {
                     ZoneOption(g, "🥥 Água de coco · ${brl(12)}", 12) {
-                        g.money -= 12; g.thirst = min(100.0, g.thirst + 35.0); g.spendTime(10); g.message = "Água de coco geladinha 🥥"
+                        g.money -= 12; g.thirst = min(100.0, g.thirst + 35.0); g.spendTime(10); g.message = "Água de coco geladinha"
                     }
                     ZoneOption(g, "🍤 Porção de camarão · ${brl(45)}", 45) {
-                        g.money -= 45; g.hunger = min(100.0, g.hunger + 40.0); g.spendTime(30); g.message = "Camarão fresquinho 🍤"
+                        g.money -= 45; g.hunger = min(100.0, g.hunger + 40.0); g.spendTime(30); g.message = "Camarão fresquinho"
                     }
                     ZoneOption(g, "🌊 Dar um mergulho (45 min)", 0) {
-                        g.thirst = max(0.0, g.thirst - 5.0); g.spendTime(45); g.message = "Mergulho refrescante! 🌊"
+                        g.thirst = max(0.0, g.thirst - 5.0); g.spendTime(45); g.message = "Mergulho refrescante!"
                     }
                     ZoneOption(g, "☀️ Tomar sol (30 min)", 0) {
-                        g.spendTime(30); g.message = "Hora de relaxar no sol ☀️"
+                        g.spendTime(30); g.message = "Hora de relaxar no sol"
                     }
                 }
                 TextButton(onClick = onClose) { Text("Fechar") }

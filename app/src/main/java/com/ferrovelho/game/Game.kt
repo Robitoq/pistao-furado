@@ -297,7 +297,7 @@ class GameState(context: Context) {
         nextId = 1
         seed = Random.nextInt()
         yards = genYards(Random(System.nanoTime()))
-        message = "Novo jogo! Você tem ${brl(START_MONEY)}. Dá uma olhada no ferro velho 🚗"
+        message = "Novo jogo! Você tem ${brl(START_MONEY)}. Dá uma olhada no ferro velho"
         save()
     }
 
@@ -443,7 +443,7 @@ class GameState(context: Context) {
         if (money < SHOP_COST) { message = "Montar a empresa custa ${brl(SHOP_COST)}."; return }
         money -= SHOP_COST
         ownShop = true
-        message = "🎉 A Ferrovelho Motors é sua! Peças 30% mais baratas e oficina aberta 24h."
+        message = "A Ferrovelho Motors é sua! Peças 30% mais baratas e oficina aberta 24h."
         save()
     }
 

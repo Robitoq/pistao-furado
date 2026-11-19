@@ -159,7 +159,7 @@ fun CarMeetDialog(g: GameState, pname: String, look: Look, onClose: () -> Unit) 
         g.money += pz
         if (pos == 0) g.meetWins += 1
         if (g.meetBest == 0 || pos + 1 < g.meetBest) g.meetBest = pos + 1
-        g.message = if (pz > 0) "🏁 Encontro de carros: você ficou em ${pos + 1}º lugar e ganhou ${brl(pz)}!"
+        g.message = if (pz > 0) "Encontro de carros: você ficou em ${pos + 1}º lugar e ganhou ${brl(pz)}!"
         else "🏁 Encontro de carros: você ficou em ${pos + 1}º lugar. Capricha no visual e volta amanhã!"
         g.save()
         prize = pz
@@ -183,21 +183,21 @@ fun CarMeetDialog(g: GameState, pname: String, look: Look, onClose: () -> Unit) 
                 Modifier.padding(14.dp).heightIn(max = 640.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("🏁 Encontro de Carros", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("Encontro de Carros", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text(
                     "Duas notas de 0 a 10: BELEZA (qual é o mais bonito: lataria, interior e tuning) e " +
                         "ESTADO (qual está melhor: motor, pneus, suspensão). Pódio: 1º ${brl(MEET_PRIZES[0])} • " +
                         "2º ${brl(MEET_PRIZES[1])} • 3º ${brl(MEET_PRIZES[2])}.",
                     fontSize = 12.sp,
                 )
-                if (g.meetWins > 0) Text("🏆 Vitórias: ${g.meetWins}", fontSize = 12.sp)
+                if (g.meetWins > 0) Text("Vitórias: ${g.meetWins}", fontSize = 12.sp)
 
                 val res = results
                 when {
                     res != null -> MeetResults(res, myPos, prize, pname, onClose)
 
                     busy -> {
-                        Text("🧑‍⚖️ Os jurados estão avaliando os carros...", fontWeight = FontWeight.Bold)
+                        Text("Os jurados estão avaliando os carros...", fontWeight = FontWeight.Bold)
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                         Text("Concorrentes de hoje:", fontSize = 12.sp)
                         field.forEach {
@@ -215,7 +215,7 @@ fun CarMeetDialog(g: GameState, pname: String, look: Look, onClose: () -> Unit) 
                         OutlinedButton(
                             onClick = { g.spendTime(MEET_START - g.minutes) },
                             Modifier.fillMaxWidth(),
-                        ) { Text("⏩ Esperar até as 18h") }
+                        ) { Text("Esperar até as 18h") }
                         TextButton(onClick = onClose) { Text("Sair") }
                     }
 
@@ -262,7 +262,7 @@ fun CarMeetDialog(g: GameState, pname: String, look: Look, onClose: () -> Unit) 
 @Composable
 private fun MeetResults(res: List<MeetEntry>, myPos: Int, prize: Int, pname: String, onClose: () -> Unit) {
     // ---- pódio (2º, 1º, 3º)
-    Text("🏆 Pódio", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    Text("Pódio", fontWeight = FontWeight.Bold, fontSize = 16.sp)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
         listOf(1, 0, 2).forEach { i ->
             val e = res[i]
@@ -287,8 +287,8 @@ private fun MeetResults(res: List<MeetEntry>, myPos: Int, prize: Int, pname: Str
     // ---- prêmios de beleza e estado
     val pretty = res.maxByOrNull { it.score.beauty }
     val best = res.maxByOrNull { it.score.state }
-    if (pretty != null) Text("🎨 Carro mais bonito: ${pretty.car.owner} — ${CATALOG[pretty.car.model].fullName} (${nota(pretty.score.beauty)})", fontSize = 12.sp)
-    if (best != null) Text("🔧 Carro em melhor estado: ${best.car.owner} — ${CATALOG[best.car.model].fullName} (${nota(best.score.state)})", fontSize = 12.sp)
+    if (pretty != null) Text("Carro mais bonito: ${pretty.car.owner} — ${CATALOG[pretty.car.model].fullName} (${nota(pretty.score.beauty)})", fontSize = 12.sp)
+    if (best != null) Text("Carro em melhor estado: ${best.car.owner} — ${CATALOG[best.car.model].fullName} (${nota(best.score.state)})", fontSize = 12.sp)
 
     // ---- classificação completa
     Text("Classificação", fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -314,7 +314,7 @@ private fun MeetResults(res: List<MeetEntry>, myPos: Int, prize: Int, pname: Str
 
     // ---- recado dos jurados + prêmio
     if (myPos >= 0) {
-        Text("🧑‍⚖️ Jurados: ${judgeComment(res[myPos].score, myPos)}", fontSize = 13.sp)
+        Text("Jurados: ${judgeComment(res[myPos].score, myPos)}", fontSize = 13.sp)
         Text(
             if (prize > 0) "💰 Prêmio: ${brl(prize)}" else "Sem prêmio dessa vez, $pname.",
             fontWeight = FontWeight.Bold, fontSize = 14.sp,

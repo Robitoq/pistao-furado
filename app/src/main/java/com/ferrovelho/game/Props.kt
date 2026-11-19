@@ -26,6 +26,9 @@ val PROPS = listOf(
     Prop("Mansão da Colina", 11300f, 900_000, 1500, 4, 0xFFFFF59D, 0xFF8D6E63, "Pra quem já fez fortuna no ferro-velho."),
 )
 val PROP_X = PROPS.map { it.x }
+const val CLUB_X = 7800f
+fun clubOpen(minutes: Int) = minutes >= 20 * 60 || minutes < 5 * 60
+const val CLUB_FEE = 30
 
 fun loadProps(c: Context): Set<Int> =
     (c.getSharedPreferences("city", Context.MODE_PRIVATE).getString("props", "") ?: "").split(",").mapNotNull { it.toIntOrNull() }.toSet()
@@ -67,7 +70,7 @@ fun PropDialog(g: GameState, idx: Int, owned: Set<Int>, onOwned: (Set<Int>) -> U
     Dialog(onDismissRequest = onClose) {
         Card {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("🏢 ${pr.name}", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("${pr.name}", fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text(pr.desc, fontSize = 13.sp)
                 Text("${pr.floors} andares • aluguel de ${brl(pr.rent)} por dia", fontSize = 12.sp)
                 Text("Seu dinheiro: ${brl(g.money)}", fontSize = 12.sp)
@@ -76,15 +79,15 @@ fun PropDialog(g: GameState, idx: Int, owned: Set<Int>, onOwned: (Set<Int>) -> U
                     Button(onClick = {
                         g.money -= pr.price
                         val n = owned + idx; saveProps(ctx, n); prefs.edit().putInt("rent$idx", g.day).apply(); onOwned(n)
-                        msg = "Parabéns! ${pr.name} agora é seu 🎉"
-                    }, Modifier.fillMaxWidth(), enabled = g.money >= pr.price) { Text("💰 Comprar por ${brl(pr.price)}") }
+                        msg = "Parabéns! ${pr.name} agora é seu"
+                    }, Modifier.fillMaxWidth(), enabled = g.money >= pr.price) { Text("Comprar por ${brl(pr.price)}") }
                 } else {
-                    Button(onClick = onEnter, Modifier.fillMaxWidth()) { Text("🚪 Entrar") }
+                    Button(onClick = onEnter, Modifier.fillMaxWidth()) { Text("Entrar") }
                     val days = min(10, (g.day - last).coerceAtLeast(0))
                     OutlinedButton(onClick = {
                         val v = days * pr.rent
-                        g.money += v; prefs.edit().putInt("rent$idx", g.day).apply(); msg = "Você recebeu ${brl(v)} de aluguel 💵"
-                    }, Modifier.fillMaxWidth(), enabled = days > 0) { Text("💵 Cobrar aluguel (${days} dia(s) · ${brl(days * pr.rent)})") }
+                        g.money += v; prefs.edit().putInt("rent$idx", g.day).apply(); msg = "Você recebeu ${brl(v)} de aluguel"
+                    }, Modifier.fillMaxWidth(), enabled = days > 0) { Text("Cobrar aluguel (${days} dia(s) · ${brl(days * pr.rent)})") }
                     OutlinedButton(onClick = {
                         val v = pr.price * 6 / 10
                         g.money += v; val n = owned - idx; saveProps(ctx, n); onOwned(n); msg = "Vendido por ${brl(v)}"
@@ -92,6 +95,34 @@ fun PropDialog(g: GameState, idx: Int, owned: Set<Int>, onOwned: (Set<Int>) -> U
                 }
                 TextButton(onClick = onClose) { Text("Fechar") }
             }
+        }
+    }
+}
+
+fun DrawScope.drawClub(open: Boolean, cam: Float, s: Float, t: Float, p: Paint) {
+    val cx = CLUB_X
+    if (cx + 70f < cam || cx - 70f > cam + VIEW_W) return
+    val x0 = cx - 40f
+    wr(Color(0x33000000), x0, 101f, 80f, 3f, cam, s)
+    wr(Color(0xFF1A1030), x0, 46f, 80f, 58f, cam, s)
+    wr(Color(0xFF0E0820), x0 - 2f, 42f, 84f, 5f, cam, s)
+    val neon = listOf(Color(0xFFFF2E93), Color(0xFF00E5FF), Color(0xFFB388FF), Color(0xFF76FF03))
+    if (open) for (k in 0 until 10) wr(neon[(k + (t * 3f).toInt()) % 4], x0 + 2f + k * 8f, 48f, 6f, 1.6f, cam, s)
+    wr(Color(0xFF0B0716), cx - 30f, 54f, 60f, 14f, cam, s)
+    wr(if (open) Color(0xFFFF2E93) else Color(0xFF4A2A44), cx - 28.5f, 55.5f, 57f, 11f, cam, s)
+    label(p, "BAILE & SHOWS", cx, 63.2f, cam, s, 5.4f, android.graphics.Color.WHITE)
+    for (k in 0..2) wr(Color(0xFF0B0716), x0 + 6f + k * 24f, 72f, 14f, 12f, cam, s)
+    wr(Color(0xFF2B1B50), cx - 7f, 104f - 20f, 14f, 20f, cam, s)
+    wr(if (open) Color(0xFF00E5FF) else Color(0xFF455A64), cx - 6f, 104f - 19f, 12f, 1.2f, cam, s)
+    wr(Color(0xFF111111), x0 - 8f, 90f, 7f, 14f, cam, s); wr(Color(0xFF111111), x0 + 81f, 90f, 7f, 14f, cam, s)
+    if (open) {
+        val ph = (t * 1.5f) % 1f
+        for (k in 0..1) {
+            val bx = cx - 20f + k * 40f
+            val beam = androidx.compose.ui.graphics.Path().apply {
+                moveTo((bx - cam) * s, 40f * s); lineTo((bx - 12f + ph * 24f - cam) * s, 0f); lineTo((bx - 4f + ph * 24f - cam) * s, 0f); close()
+            }
+            drawPath(beam, neon[k * 2 % 4].copy(alpha = 0.25f))
         }
     }
 }

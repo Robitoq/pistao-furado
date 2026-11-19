@@ -116,7 +116,7 @@ fun GameState.buildCompany(idx: Int, nome: String = "") {
     money -= COMPANY_COST[idx]
     companies = companies + idx
     if (nome.trim().isNotEmpty()) nomes = nomes + ("e$idx" to nome.trim().take(20))
-    message = "🎉 ${empName(idx)} inaugurada! Passa lá pra tocar o negócio."
+    message = "${empName(idx)} inaugurada! Passa lá pra tocar o negócio."
     save()
 }
 
@@ -125,7 +125,7 @@ fun GameState.buyHouse(h: House) {
     money -= h.paid
     houseMarket = houseMarket.filter { it.id != h.id }
     houses = houses + h
-    message = "🏠 Comprou ${h.name} (${h.hood}) por ${brl(h.paid)}."
+    message = "Comprou ${h.name} (${h.hood}) por ${brl(h.paid)}."
     save()
 }
 
@@ -136,7 +136,7 @@ fun GameState.renovate(h: House) {
     money -= c
     spendTime(120)
     houses = houses.map { if (it.id == h.id) it.copy(cond = min(100, it.cond + 15), spent = it.spent + c) else it }
-    message = "🔨 Reforma feita em ${h.name}."
+    message = "Reforma feita em ${h.name}."
     save()
 }
 
@@ -147,7 +147,7 @@ fun GameState.sellHouse(h: House, price: Int) {
     totalProfit += profit
     houses = houses.filter { it.id != h.id }
     spendTime(60)
-    message = if (profit >= 0) "Vendeu ${h.name} por ${brl(price)} — lucro de ${brl(profit)} 💰"
+    message = if (profit >= 0) "Vendeu ${h.name} por ${brl(price)} — lucro de ${brl(profit)}"
     else "Vendeu ${h.name} por ${brl(price)} — prejuízo de ${brl(-profit)} 😬"
     save()
 }
@@ -283,8 +283,8 @@ fun GarageDialog(g: GameState, onClose: () -> Unit) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("🚗 Minha garagem  •  ${brl(g.money)}", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    TextButton(onClick = onClose) { Text("✖ Sair") }
+                    Text("Minha garagem • ${brl(g.money)}", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = onClose) { Text("Sair") }
                 }
                 if (g.message.isNotEmpty()) {
                     Text(g.message, Modifier.fillMaxWidth().padding(horizontal = 12.dp).clickable { g.message = "" }, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
@@ -306,7 +306,7 @@ fun SummaryDialog(g: GameState, onClose: () -> Unit) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(end = 4.dp), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onClose) { Text("✖ Sair") }
+                    TextButton(onClick = onClose) { Text("Sair") }
                 }
                 Box(Modifier.weight(1f)) { SummaryScreen(g) { askReset = true } }
             }
@@ -336,7 +336,7 @@ fun CompanyDialog(g: GameState, idx: Int, onClose: () -> Unit) {
                         Text("${COMPANY_ICONS[idx]} ${g.empName(idx)}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text("${g.dateText()}  •  ${brl(g.money)}" + if (idx in g.companies) "  •  custo ${brl(COMPANY_UPKEEP[idx])}/dia" else "", fontSize = 11.sp)
                     }
-                    TextButton(onClick = onClose) { Text("✖ Sair") }
+                    TextButton(onClick = onClose) { Text("Sair") }
                 }
                 if (g.message.isNotEmpty()) {
                     Text(g.message, Modifier.fillMaxWidth().clickable { g.message = "" }, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
@@ -353,7 +353,7 @@ fun CompanyDialog(g: GameState, idx: Int, onClose: () -> Unit) {
 @Composable
 private fun BuyLot(g: GameState, idx: Int) {
     var nome by remember { mutableStateOf("") }
-    Text("📍 Terreno à venda", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+    Text("Terreno à venda", fontSize = 16.sp, fontWeight = FontWeight.Bold)
     Text(COMPANY_DESC[idx], fontSize = 13.sp)
     Text("Custo fixo: ${brl(COMPANY_UPKEEP[idx])} por dia (aluguel e funcionários), vendendo ou não.", fontSize = 13.sp)
     OutlinedTextField(value = nome, onValueChange = { nome = it.take(20) }, singleLine = true, label = { Text("Nome da empresa (opcional)") }, modifier = Modifier.fillMaxWidth())
@@ -361,7 +361,7 @@ private fun BuyLot(g: GameState, idx: Int) {
         onClick = { g.buildCompany(idx, nome) },
         enabled = g.money >= COMPANY_COST[idx],
         modifier = Modifier.fillMaxWidth().height(50.dp),
-    ) { Text("🏗️ Construir · ${brl(COMPANY_COST[idx])}", fontWeight = FontWeight.Bold) }
+    ) { Text("Construir · ${brl(COMPANY_COST[idx])}", fontWeight = FontWeight.Bold) }
     if (g.money < COMPANY_COST[idx]) {
         Text("Faltam ${brl(COMPANY_COST[idx] - g.money)}.", fontSize = 12.sp, color = Color(0xFFEF5350))
     }
@@ -372,7 +372,7 @@ internal fun PriceRow(g: GameState, key: String, suggested: Int) {
     val ask = g.stock[key]
     if (ask == null) {
         Button(onClick = { g.setAsk(key, suggested) }, modifier = Modifier.fillMaxWidth()) {
-            Text("🏷️ Pôr à venda por ${brl(suggested)}", fontSize = 13.sp)
+            Text("Pôr à venda por ${brl(suggested)}", fontSize = 13.sp)
         }
     } else {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -387,7 +387,7 @@ internal fun PriceRow(g: GameState, key: String, suggested: Int) {
 @Composable
 private fun ColumnScope.DealerBody(g: GameState) {
     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("🏷️ Estoque da loja", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Text("Estoque da loja", fontSize = 15.sp, fontWeight = FontWeight.Bold)
         if (g.garage.isEmpty()) {
             Text("Sua garagem está vazia. Compre carros nos ferros-velhos da cidade e traga pra cá.", fontSize = 13.sp)
         }
@@ -413,8 +413,8 @@ private fun ColumnScope.DealerBody(g: GameState) {
 private fun ColumnScope.RealtyBody(g: GameState) {
     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val arrow = if (g.houseTrend > 0.001) "▲" else if (g.houseTrend < -0.001) "▼" else "▬"
-        Text("📈 Mercado imobiliário: ${(g.houseIdx * 100).roundToInt()}% $arrow", fontSize = 13.sp)
-        Text("🏘️ Casas à venda hoje (corretor)", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Text("Mercado imobiliário: ${(g.houseIdx * 100).roundToInt()}% $arrow", fontSize = 13.sp)
+        Text("Casas à venda hoje (corretor)", fontSize = 15.sp, fontWeight = FontWeight.Bold)
         if (g.houseMarket.isEmpty()) Text("Nenhuma casa hoje. Volte amanhã.", fontSize = 13.sp)
         g.houseMarket.forEach { h ->
             Card(Modifier.fillMaxWidth()) {
@@ -427,7 +427,7 @@ private fun ColumnScope.RealtyBody(g: GameState) {
                 }
             }
         }
-        Text("🏠 Meus imóveis", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Text("Meus imóveis", fontSize = 15.sp, fontWeight = FontWeight.Bold)
         if (g.houses.isEmpty()) Text("Você ainda não tem imóveis.", fontSize = 13.sp)
         g.houses.forEach { h ->
             Card(Modifier.fillMaxWidth()) {
@@ -435,7 +435,7 @@ private fun ColumnScope.RealtyBody(g: GameState) {
                     Text("${h.name} • ${h.hood}", fontWeight = FontWeight.Bold)
                     Text("Pago ${brl(h.paid)} • reformas ${brl(h.spent)} • vale hoje ${brl(houseWorth(g, h))} • condição ${h.cond}%", fontSize = 12.sp)
                     OutlinedButton(onClick = { g.renovate(h) }, enabled = h.cond < 100, modifier = Modifier.fillMaxWidth()) {
-                        Text("🔨 Reformar +15% · ${brl(renovateCost(h))}", fontSize = 13.sp)
+                        Text("Reformar +15% · ${brl(renovateCost(h))}", fontSize = 13.sp)
                     }
                     PriceRow(g, "h${h.id}", roundTo50(houseWorth(g, h) * 1.10))
                 }
@@ -471,7 +471,6 @@ private fun DealScene(c: Customer, me: Look, buyer: Look, home: Boolean) {
             drawChar(me, size.width * 0.12f + lunge, top - hop(meTalks), cu, false, 0f, t * 2f)
             drawChar(buyer, size.width * 0.88f - 12f * cu + lunge2, top - hop(!meTalks), cu, true, 0f, t * 2f + 1.7f)
         }
-        Text(if (home) "🏠" else "🚗", Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp), fontSize = 30.sp)
         Text(
             buyerLine, Modifier.align(Alignment.TopEnd).padding(8.dp).fillMaxWidth(0.62f)
                 .background(Color.White.copy(alpha = if (meTalks) 0.7f else 1f), RoundedCornerShape(10.dp)).padding(7.dp),
@@ -487,7 +486,7 @@ private fun DealScene(c: Customer, me: Look, buyer: Look, home: Boolean) {
 
 @Composable
 private fun CustomerSection(g: GameState) {
-    Text("👥 Clientes na loja", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+    Text("Clientes na loja", fontSize = 15.sp, fontWeight = FontWeight.Bold)
     if (g.minutes !in (8 * 60) until (20 * 60)) {
         Text("Fora do horário (8h às 20h). Os clientes voltam no horário de funcionamento.", fontSize = 13.sp)
         return
@@ -502,12 +501,12 @@ private fun CustomerSection(g: GameState) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 DealScene(c, myLook, remember(c.who, c.key) { randomLook(Random(c.who.hashCode() * 31 + c.key.hashCode())) }, !c.key.startsWith("c"))
-                Text("🙋 ${c.who} quer: ${c.what}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("${c.who} quer: ${c.what}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 Text("Seu preço: ${brl(c.ask)} • Oferta dele(a): ${brl(c.offer)}", fontSize = 13.sp)
                 Button(
                     onClick = { closeDeal(g, c, c.offer); custs.removeAll { it.key == c.key } },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("✅ Aceitar ${brl(c.offer)}") }
+                ) { Text("Aceitar ${brl(c.offer)}") }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     for (pct in listOf(5, 10, 15)) {
                         OutlinedButton(
@@ -526,7 +525,7 @@ private fun CustomerSection(g: GameState) {
                                     c.offer = max(c.offer, roundTo50(c.limit * 0.97))
                                     c.msg = "Hmm, tá puxado... chego em ${brl(c.offer)}, não passo disso."
                                 } else {
-                                    g.message = "${c.who} achou caro e foi embora 😒"
+                                    g.message = "${c.who} achou caro e foi embora"
                                     custs.remove(c)
                                 }
                             },
@@ -572,7 +571,7 @@ fun GameState.setNome(key: String, name: String) {
 fun RenameButton(g: GameState, key: String, current: String) {
     var open by remember { mutableStateOf(false) }
     var txt by remember { mutableStateOf(current) }
-    OutlinedButton(onClick = { txt = current; open = true }, modifier = Modifier.fillMaxWidth()) { Text("✏️ Renomear", fontSize = 13.sp) }
+    OutlinedButton(onClick = { txt = current; open = true }, modifier = Modifier.fillMaxWidth()) { Text("Renomear", fontSize = 13.sp) }
     if (open) {
         AlertDialog(
             onDismissRequest = { open = false },
@@ -601,7 +600,7 @@ fun GameState.buildLoja(lot: Int, type: Int, nome: String = "") {
     lojas = lojas + (lot to type)
     lojaPreco = lojaPreco + (lot to 1)
     if (nome.trim().isNotEmpty()) nomes = nomes + ("l$lot" to nome.trim().take(20))
-    message = "🎉 ${lojaName(lot)} inaugurado! O lucro (ou prejuízo) vem toda vez que você dorme."
+    message = "${lojaName(lot)} inaugurado! O lucro (ou prejuízo) vem toda vez que você dorme."
     save()
 }
 
@@ -727,7 +726,7 @@ fun LojaDialog(g: GameState, lot: Int, onClose: () -> Unit) {
                         Text(lojaLabel(g, lot), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text("${g.dateText()}  •  ${brl(g.money)}", fontSize = 11.sp)
                     }
-                    TextButton(onClick = onClose) { Text("✖ Sair") }
+                    TextButton(onClick = onClose) { Text("Sair") }
                 }
                 if (g.message.isNotEmpty()) {
                     Text(g.message, Modifier.fillMaxWidth().clickable { g.message = "" }, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
@@ -735,7 +734,7 @@ fun LojaDialog(g: GameState, lot: Int, onClose: () -> Unit) {
                 val type = g.lojas[lot]
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (type == null) {
-                        Text("📍 Terreno à venda. Escolha o negócio:", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text("Terreno à venda. Escolha o negócio:", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         OutlinedTextField(value = nome, onValueChange = { nome = it.take(20) }, singleLine = true, label = { Text("Nome da loja (opcional)") }, modifier = Modifier.fillMaxWidth())
                         for (ty in LOJA_NAMES.indices) {
                             Card(Modifier.fillMaxWidth()) {
@@ -743,7 +742,7 @@ fun LojaDialog(g: GameState, lot: Int, onClose: () -> Unit) {
                                     Text("${LOJA_ICONS[ty]} ${LOJA_NAMES[ty]}", fontWeight = FontWeight.Bold)
                                     Text("Custo fixo ${brl(LOJA_UPKEEP[ty])}/dia • vendas médias ${brl(LOJA_SALES[ty].toInt())}/dia", fontSize = 12.sp)
                                     Button(onClick = { g.buildLoja(lot, ty, nome) }, enabled = g.money >= LOJA_COST[ty], modifier = Modifier.fillMaxWidth()) {
-                                        Text("🏗️ Construir · ${brl(LOJA_COST[ty])}", fontSize = 13.sp)
+                                        Text("Construir · ${brl(LOJA_COST[ty])}", fontSize = 13.sp)
                                     }
                                 }
                             }
@@ -759,7 +758,7 @@ fun LojaDialog(g: GameState, lot: Int, onClose: () -> Unit) {
                                 fontSize = 14.sp, fontWeight = FontWeight.Bold,
                             )
                         }
-                        Text("💲 Preço praticado:", fontWeight = FontWeight.Bold)
+                        Text("Preço praticado:", fontWeight = FontWeight.Bold)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             for (i in 0..2) {
                                 val label = PRICE_NAMES[i]
@@ -779,10 +778,10 @@ fun LojaDialog(g: GameState, lot: Int, onClose: () -> Unit) {
                                 g.hunger = min(100.0, g.hunger + 45.0)
                                 g.thirst = min(100.0, g.thirst + 35.0)
                                 g.spendTime(15)
-                                g.message = "🍴 Você comeu e bebeu na sua loja, de graça."
+                                g.message = "Você comeu e bebeu na sua loja, de graça."
                             },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("🍴 Comer e beber aqui (grátis)") }
+                        ) { Text("Comer e beber aqui (grátis)") }
                         OutlinedButton(onClick = { g.sellLoja(lot); onClose() }, modifier = Modifier.fillMaxWidth()) {
                             Text("Vender a loja por ${brl((LOJA_COST[type] * 0.6).toInt())}", fontSize = 13.sp)
                         }

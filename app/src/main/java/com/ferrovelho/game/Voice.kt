@@ -12,29 +12,14 @@ object Voice {
         private set
 
     fun init(ctx: Context) {
-        enabled = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE).getBoolean("voice", true)
-        if (tts != null) return
-        try {
-            tts = TextToSpeech(ctx.applicationContext) { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    val r = tts?.setLanguage(Locale("pt", "BR"))
-                    ready = r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED
-                }
-            }
-        } catch (e: Throwable) {
-            tts = null
-        }
+        enabled = false   // voz removida do jogo
     }
 
     private fun clean(s: String) = s.filter { it.isLetterOrDigit() || it in " .,!?'-$:%" }.replace("R$", "reais ")
 
+    @Suppress("UNUSED_PARAMETER")
     fun speak(text: String, pitch: Float = 1f, rate: Float = 1f, add: Boolean = false) {
-        if (!enabled || !ready) return
-        try {
-            tts?.setPitch(pitch)
-            tts?.setSpeechRate(rate)
-            tts?.speak(clean(text), if (add) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH, null, "v" + System.nanoTime())
-        } catch (_: Throwable) {}
+        // sem fala: a voz foi removida
     }
 
     fun stop() {
