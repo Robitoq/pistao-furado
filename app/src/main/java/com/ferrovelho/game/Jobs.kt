@@ -27,6 +27,7 @@ import kotlin.random.Random
 class Job(
     val emoji: String, val title: String, val desc: String, val minutes: Int, val pay: Int,
     val from: Int, val to: Int, val bg: Long, val hungerCost: Int,
+    val total: Int = 10, val life: Float = 1.8f, val gap: Float = 1.3f,
 )
 
 val JOBS = listOf(
@@ -34,6 +35,12 @@ val JOBS = listOf(
     Job("🧽", "Lavador no lava-jato", "Estoure as manchas de sujeira dos carros.", 90, 70, 7 * 60, 18 * 60, 0xFF0D47A1, 12),
     Job("🥖", "Caixa da padaria", "Atenda os clientes que chegam no balcão.", 180, 120, 6 * 60, 21 * 60, 0xFF6D4C41, 18),
     Job("🔩", "Ajudante de mecânico", "Pegue as peças certas na hora certa.", 120, 110, 8 * 60, 18 * 60, 0xFF37474F, 15),
+    Job("🚕", "Motorista de app", "Leve os passageiros rápido, sem atrasar.", 150, 100, 6 * 60, 22 * 60, 0xFF263238, 14, 12, 1.6f, 1.1f),
+    Job("🏗️", "Servente de obra", "Pegue os tijolos antes que caiam.", 240, 150, 7 * 60, 16 * 60, 0xFF795548, 22, 12, 1.7f, 1.2f),
+    Job("📦", "Estoquista do mercadinho", "Arrume as caixas nas prateleiras.", 120, 80, 6 * 60, 22 * 60, 0xFF1B5E20, 12),
+    Job("🧹", "Faxineiro de prédio", "Cace a sujeira dos corredores.", 90, 75, 8 * 60, 17 * 60, 0xFF4527A0, 10, 8, 2.2f, 1.5f),
+    Job("🚛", "Motorista de guincho", "Atenda os chamados de socorro na estrada.", 120, 130, 8 * 60, 20 * 60, 0xFFBF360C, 16, 10, 1.5f, 1.2f),
+    Job("🎵", "DJ de festa", "Acerte as batidas no ritmo da pista.", 180, 220, 20 * 60, 4 * 60, 0xFF311B92, 16, 14, 1.2f, 0.9f),
     Job("🌙", "Vigia noturno", "Fique de olho e pegue os vultos suspeitos.", 240, 180, 22 * 60, 6 * 60, 0xFF0B1026, 20),
 )
 
@@ -87,7 +94,7 @@ fun JobsDialog(g: GameState, onClose: () -> Unit) {
 
 @Composable
 private fun JobGame(job: Job, onDone: (Int, Int) -> Unit) {
-    val total = 10
+    val total = job.total
     val tg = remember { mutableListOf<Tgt>() }
     var tick by remember { mutableIntStateOf(0) }
     var hits by remember { mutableIntStateOf(0) }
@@ -100,9 +107,9 @@ private fun JobGame(job: Job, onDone: (Int, Int) -> Unit) {
             withFrameNanos { ns ->
                 val dt = if (last == 0L) 0f else ((ns - last) / 1e9f).coerceAtMost(0.05f)
                 last = ns; t += dt
-                if (spawned < total && t >= 0.8f + spawned * 1.3f) { tg.add(Tgt(0.12f + rnd.nextFloat() * 0.76f, 0.12f + rnd.nextFloat() * 0.76f, t)); spawned++ }
+                if (spawned < total && t >= 0.8f + spawned * job.gap) { tg.add(Tgt(0.12f + rnd.nextFloat() * 0.76f, 0.12f + rnd.nextFloat() * 0.76f, t)); spawned++ }
                 tick++
-                if (spawned >= total && t >= 0.8f + total * 1.3f + 1.2f) { finished = true; onDone(hits, total) }
+                if (spawned >= total && t >= 0.8f + total * job.gap + 1.2f) { finished = true; onDone(hits, total) }
             }
         }
     }
@@ -113,7 +120,7 @@ private fun JobGame(job: Job, onDone: (Int, Int) -> Unit) {
             Modifier.fillMaxWidth().aspectRatio(0.85f).pointerInput(Unit) {
                 detectTapGestures { off ->
                     val w = size.width.toFloat(); val h = size.height.toFloat()
-                    val hit = tg.filter { !it.hit && t - it.born < 1.8f }.minByOrNull { (it.x * w - off.x) * (it.x * w - off.x) + (it.y * h - off.y) * (it.y * h - off.y) }
+                    val hit = tg.filter { !it.hit && t - it.born < job.life }.minByOrNull { (it.x * w - off.x) * (it.x * w - off.x) + (it.y * h - off.y) * (it.y * h - off.y) }
                     if (hit != null && sqrt((hit.x * w - off.x) * (hit.x * w - off.x) + (hit.y * h - off.y) * (hit.y * h - off.y)) < w * 0.12f) { hit.hit = true; hits++ }
                 }
             },
@@ -123,10 +130,10 @@ private fun JobGame(job: Job, onDone: (Int, Int) -> Unit) {
             val p = Paint().apply { textSize = size.width * 0.12f; textAlign = Paint.Align.CENTER }
             for (a in tg) {
                 val age = t - a.born
-                if (a.hit || age > 1.8f) continue
+                if (a.hit || age > job.life) continue
                 val cx = a.x * size.width; val cy = a.y * size.height
                 drawCircle(Color(0x33FFFFFF), size.width * 0.09f, Offset(cx, cy))
-                drawCircle(Color(0xFFFFEB3B), size.width * 0.09f * (1f - age / 1.8f) + 4f, Offset(cx, cy), style = androidx.compose.ui.graphics.drawscope.Stroke(5f))
+                drawCircle(Color(0xFFFFEB3B), size.width * 0.09f * (1f - age / job.life) + 4f, Offset(cx, cy), style = androidx.compose.ui.graphics.drawscope.Stroke(5f))
                 drawIntoCanvas { it.nativeCanvas.drawText(job.emoji, cx, cy + p.textSize * 0.35f, p) }
             }
         }

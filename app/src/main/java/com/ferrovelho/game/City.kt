@@ -48,7 +48,7 @@ const val VIEW_W = 190f
 private val YARD_X = listOf(520f, 1450f, 2450f, 3500f, 4450f)
 private const val HOME_X = 260f     // casa do personagem
 private const val MEET_X = 2000f    // encontro de carros
-private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X + COMPANY_X + LOJA_X + DRAG_X
+private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X + COMPANY_X + LOJA_X + DRAG_X + PROP_X
 private val PLACE_X = YARD_X + NEW_PLACES
 
 val CSKIN = listOf(0xFFFFDBB4, 0xFFF1C27D, 0xFFE0AC69, 0xFFC68642, 0xFF8D5524, 0xFF6B4423, 0xFF4A2C17).map { Color(it) }
@@ -554,6 +554,11 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var garageListDlg by remember { mutableStateOf(false) }
     var summaryDlg by remember { mutableStateOf(false) }
     var jobDlg by remember { mutableStateOf(false) }
+    var ownedProps by remember { mutableStateOf(loadProps(ctx)) }
+    var propDlg by remember { mutableStateOf<Int?>(null) }
+    var propInside by remember { mutableStateOf<Int?>(null) }
+    var wakeX by remember { mutableFloatStateOf(HOME_X + 30f) }
+    val nearProp by remember { derivedStateOf { PROP_X.indexOfFirst { abs(px - it) < 45f } } }
     var bizDlg by remember { mutableStateOf<Int?>(null) }
     var driveId by remember { mutableStateOf<Int?>(null) }
     var zoneDlg by remember { mutableStateOf<Int?>(null) }
@@ -586,7 +591,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || jobDlg || bizDlg != null || shopDlg != null || chatPed != null
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || jobDlg || propDlg != null || propInside != null || bizDlg != null || shopDlg != null || chatPed != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -930,6 +935,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 garageSignText = g.motorsName().uppercase()
                 drawGarageShop(g.ownShop, garageOpen(g), cam, s, t, paint)
                 drawStores(storesOpen, cam, s, t, paint)
+                drawProps(ownedProps, cam, s, t, paint)
                 drawCompanies(g, cam, s, t, paint)
                 drawLojas(g, cam, s, t, paint)
                 drawDragStrip(cam, s, t, paint)
@@ -1135,6 +1141,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     }
                 } else if (nearStore >= 0) {
                     Button(onClick = { shopDlg = nearStore }) { Text(STORES[nearStore].title.substringBefore(" ") + " Entrar", fontSize = 13.sp) }
+                } else if (nearProp >= 0) {
+                    Button(onClick = { propDlg = nearProp }) { Text(if (nearProp in ownedProps) "🏢 ${PROPS[nearProp].name}" else "🏢 Imóvel à venda", fontSize = 13.sp) }
                 } else if (nearPed >= 0) {
                     Button(onClick = { chatPed = nearPed }) { Text("💬 Conversar com ${pedName(nearPed)}", fontSize = 13.sp) }
                 } else {
@@ -1172,14 +1180,16 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     lojaDlg?.let { li -> LojaDialog(g, li) { lojaDlg = null } }
     bizDlg?.let { bi -> if (bi == 0 && 0 in g.companies) InteriorDialog(g, Room.SHOP) { bizDlg = null } else CompanyDialog(g, bi) { bizDlg = null } }
     shopDlg?.let { si -> InteriorDialog(g, Room.STORE, storeIdx = si) { shopDlg = null } }
+    propDlg?.let { pi -> PropDialog(g, pi, ownedProps, onOwned = { ownedProps = it }, onEnter = { propDlg = null; propInside = pi }) { propDlg = null } }
+    propInside?.let { pi -> InteriorDialog(g, Room.HOME, onSleep = { propInside = null; wakeX = PROPS[pi].x; sleepTaxi = false; sleeping = true }, title = "🏢 ${PROPS[pi].name}") { propInside = null } }
     chatPed?.let { pi -> StreetChat(g, peds[pi].look, pedName(pi), me.name) { chatPed = null } }
     if (homeDlg) {
-        InteriorDialog(g, Room.HOME, onSleep = { homeDlg = false; sleepTaxi = false; sleeping = true }) { homeDlg = false }
+        InteriorDialog(g, Room.HOME, onSleep = { homeDlg = false; wakeX = HOME_X + 30f; sleepTaxi = false; sleeping = true }) { homeDlg = false }
     }
     if (sleeping) {
         SleepScene(g, me.name, me.look.female, sleepTaxi) {
             sleeping = false
-            px = HOME_X + 30f
+            px = wakeX
             face = 1
             prefs.edit().putFloat("x", px).apply()
             say = "Bom dia! Hoje eu fecho negócio."

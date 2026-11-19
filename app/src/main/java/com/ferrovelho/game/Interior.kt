@@ -105,7 +105,7 @@ private fun commentFor(g: GameState, c: OwnedCar, rnd: Random): String {
 }
 
 @Composable
-fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx: Int = 0, onClose: () -> Unit) {
+fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx: Int = 0, title: String? = null, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = remember { ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE) }
     val profile = remember { loadProfile(prefs) }
@@ -303,7 +303,7 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        when (room) { Room.SHOP -> "🏬 ${g.empName(0)}"; Room.WORKSHOP -> "🔧 ${g.motorsName()}"; Room.STORE -> store!!.title; Room.PARK -> "🌳 Parque Central"; Room.BEACH -> "🏖️ Praia"; else -> "🏠 Minha casa" },
+                        when (room) { Room.SHOP -> "🏬 ${g.empName(0)}"; Room.WORKSHOP -> "🔧 ${g.motorsName()}"; Room.STORE -> store!!.title; Room.PARK -> "🌳 Parque Central"; Room.BEACH -> "🏖️ Praia"; else -> title ?: "🏠 Minha casa" },
                         Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.Bold,
                     )
                     TextButton(onClick = { gb = !gb }) { Text(if (gb) "🎮 GB" else "🎨 Cor", fontSize = 12.sp) }
