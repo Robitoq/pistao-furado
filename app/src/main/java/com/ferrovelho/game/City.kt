@@ -553,6 +553,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var garageDlg by remember { mutableStateOf(false) }
     var garageListDlg by remember { mutableStateOf(false) }
     var summaryDlg by remember { mutableStateOf(false) }
+    var jobDlg by remember { mutableStateOf(false) }
     var bizDlg by remember { mutableStateOf<Int?>(null) }
     var driveId by remember { mutableStateOf<Int?>(null) }
     var zoneDlg by remember { mutableStateOf<Int?>(null) }
@@ -585,7 +586,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || bizDlg != null || shopDlg != null || chatPed != null
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || jobDlg || bizDlg != null || shopDlg != null || chatPed != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -1145,6 +1146,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 Row {
                     TextButton(onClick = { garageListDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("🚗 Garagem", fontSize = 12.sp) }
                     TextButton(onClick = { summaryDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("📊 Resumo", fontSize = 12.sp) }
+                    TextButton(onClick = { jobDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("💼 Trabalhar", fontSize = 12.sp) }
                 }
                 Row {
                     TextButton(onClick = { taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("🚕 Táxi", fontSize = 12.sp) }
@@ -1163,6 +1165,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     if (garageDlg) { if (g.ownShop) InteriorDialog(g, Room.WORKSHOP) { garageDlg = false } else WorkshopDialog(g) { garageDlg = false } }
     if (garageListDlg) GarageDialog(g) { garageListDlg = false }
     if (summaryDlg) SummaryDialog(g) { summaryDlg = false }
+    if (jobDlg) JobsDialog(g) { jobDlg = false }
     if (driveDlg) CarPickDialog(g, onPick = { driveId = it; driveDlg = false }, onClose = { driveDlg = false })
     if (dragDlg) DragDialog(g, spr) { dragDlg = false }
     zoneDlg?.let { zi -> InteriorDialog(g, if (zi == 0) Room.PARK else Room.BEACH) { zoneDlg = null } }
