@@ -72,6 +72,17 @@ jobs:
               implementation("androidx.activity:activity-compose:1.9.2")
           }
           EOT
+      - name: Corrigir arquivos com .txt
+        run: |
+          G=app/src/main/java/com/ferrovelho/game
+          for f in $G/*.kt.txt; do
+            if [ -e "$f" ]; then
+              mv -f "$f" "${f%.txt}"
+              echo "Renomeado: $f"
+            fi
+          done
+          rm -f $G/build.gradle.kts.txt
+          rm -f app/build.gradle.kts.txt
       - name: Conferir arquivos do projeto
         run: |
           ERRO=0
