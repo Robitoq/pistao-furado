@@ -9,7 +9,6 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -17,7 +16,6 @@ import kotlin.random.Random
 
 const val START_MONEY = 15000
 const val MAX_COND = 100
-const val SHOP_COST = 100_000   // montar a empresa própria (Ferrovelho Motors)
 
 val PART_NAMES = listOf("Motor", "Lataria", "Pneus", "Interior", "Suspensão")
 val PART_WEIGHT = listOf(0.30, 0.25, 0.10, 0.15, 0.20)
@@ -94,13 +92,11 @@ val EVENTS = listOf(
 /** Sazonalidade por mês (jan = IPVA, dez = 13º salário). */
 val SEASON = listOf(0.95, 0.98, 1.0, 1.0, 1.0, 1.0, 1.02, 1.0, 1.0, 1.0, 1.01, 1.04)
 
-val YARD_NAMES = listOf("Ferro Velho do Zé", "Desmanche Central", "Pátio Premium", "Sucata do Beto", "Pátio do Rodrigo")
+val YARD_NAMES = listOf("Ferro Velho do Zé", "Desmanche Central", "Pátio Premium")
 val YARD_DESC = listOf(
     "Carros baratos e batidos (até ~R$ 60 mil de valor)",
     "De tudo um pouco (R$ 20 mil a R$ 160 mil)",
     "Esportivos, SUVs e importados (a partir de R$ 100 mil)",
-    "Lataria barata e história esquisita (até ~R$ 40 mil)",
-    "Carros honestos de meio de faixa (R$ 40 mil a R$ 130 mil)",
 )
 
 data class OwnedCar(
@@ -168,30 +164,6 @@ class GameState(context: Context) {
     var message by mutableStateOf("")
     var sold by mutableStateOf(0)
     var totalProfit by mutableStateOf(0)
-    var meetDay by mutableStateOf(0)    // último dia em que participou do encontro de carros
-    var meetWins by mutableStateOf(0)   // quantas vezes ficou em 1º lugar
-    var meetBest by mutableStateOf(0)   // melhor colocação (0 = nunca participou)
-    var hunger by mutableStateOf(85.0)  // 100 = satisfeito, 0 = morrendo de fome
-    var thirst by mutableStateOf(85.0)  // 100 = hidratado, 0 = morrendo de sede
-    var ownShop by mutableStateOf(false) // empresa própria: oficina com desconto e aberta 24h
-    var companies by mutableStateOf(setOf<Int>())              // empresas no mapa: 0 revenda, 1 imobiliária
-    var houses by mutableStateOf(listOf<House>())              // imóveis da imobiliária
-    var houseMarket by mutableStateOf(listOf<House>())         // casas que o corretor oferece hoje
-    var stock by mutableStateOf(mapOf<String, Int>())          // "c<id>" / "h<id>" -> preço pedido na loja
-    var hSold by mutableStateOf(0)                             // casas vendidas
-    var houseSeq = 1
-    var nomes by mutableStateOf(mapOf<String, String>())   // nomes escolhidos: "e0" empresa, "l0" loja, "o" oficina
-    var lojas by mutableStateOf(mapOf<Int, Int>())       // terreno -> tipo de loja
-    var lojaPreco by mutableStateOf(mapOf<Int, Int>())   // terreno -> 0 barato, 1 normal, 2 caro
-    var lojaUltimo by mutableStateOf(mapOf<Int, Int>())  // terreno -> lucro do último dia
-    var houseIdx by mutableStateOf(1.0)      // mercado imobiliário (1.0 = normal)
-    var houseTrend = 0.0
-    var debtDays by mutableStateOf(0)        // dias seguidos no vermelho
-    var bankrupt by mutableStateOf(false)
-
-    /** Desconto da empresa própria em reparos, tuning e pintura. */
-    val shopDisc: Double get() = if (ownShop) 0.0 else 1.0   // oficina própria: peças, tuning e pintura de graça
-    val starving: Boolean get() = hunger < 15.0 || thirst < 15.0
 
     private var nextId = 1
     private var seed = Random.nextInt()
@@ -206,20 +178,10 @@ class GameState(context: Context) {
     }
 
     fun dateText(): String =
-        (if (minutes < 6 * 60 || minutes >= 19 * 60) "🌙 " else "☀️ ") +
-            SimpleDateFormat("EEE, dd/MM/yyyy", PT_BR).format(cal().time) +
+        SimpleDateFormat("EEE, dd/MM/yyyy", PT_BR).format(cal().time) +
             " • " + String.format(PT_BR, "%02d:%02d", minutes / 60, minutes % 60)
 
-    private fun tick(min: Int) {
-        minutes = (minutes + min).coerceAtMost(23 * 60 + 59)
-        hunger = (hunger - min * 0.08).coerceAtLeast(0.0)
-        thirst = (thirst - min * 0.11).coerceAtLeast(0.0)
-    }
-
-    fun spendTime(min: Int) = tick(min)
-
-    /** Relógio andando sozinho: chamado a cada segundo pela UI. */
-    fun clockTick() { if (minutes < 23 * 60 + 59) tick(2) }
+    private fun tick(min: Int) { minutes = (minutes + min).coerceAtMost(23 * 60 + 59) }
 
     val event: MarketEvent? get() = EVENTS.getOrNull(eventIdx)
 
@@ -274,30 +236,10 @@ class GameState(context: Context) {
         garage = emptyList()
         sold = 0
         totalProfit = 0
-        meetDay = 0
-        meetWins = 0
-        meetBest = 0
-        hunger = 85.0
-        thirst = 85.0
-        ownShop = false
-        companies = emptySet()
-        houses = emptyList()
-        stock = emptyMap()
-        hSold = 0
-        houseSeq = 1
-        nomes = emptyMap()
-        lojas = emptyMap()
-        lojaPreco = emptyMap()
-        lojaUltimo = emptyMap()
-        houseIdx = 1.0
-        houseTrend = 0.0
-        debtDays = 0
-        bankrupt = false
-        refreshHouses()
         nextId = 1
         seed = Random.nextInt()
         yards = genYards(Random(System.nanoTime()))
-        message = "Novo jogo! Você tem ${brl(START_MONEY)}. Dá uma olhada no ferro velho"
+        message = "Novo jogo! Você tem ${brl(START_MONEY)}. Dá uma olhada no ferro velho 🚗"
         save()
     }
 
@@ -306,53 +248,26 @@ class GameState(context: Context) {
         minutes = 8 * 60
         val news = stepMarket()
         yards = genYards(Random(System.nanoTime()))
-        // durante a noite o personagem fica sem comer: acorda com fome, mas não morrendo
-        hunger = (hunger - 25.0).coerceAtLeast(25.0.coerceAtMost(hunger))
-        thirst = (thirst - 20.0).coerceAtLeast(25.0.coerceAtMost(thirst))
         var msg = "Dia $day: chegaram carros novos nos ferros-velhos."
-        if (ownShop) {
-            val inc = Random.nextInt(300, 900)
-            money += inc
-            msg += " 🔧 A Ferrovelho Motors rendeu ${brl(inc)} de serviços."
-        }
         if (news.isNotEmpty()) msg += " 📰 $news"
-        val houseNews = stepHouses()
-        if (houseNews.isNotEmpty()) msg += " 🏘️ $houseNews"
-        val bills = dailyBills()
-        if (bills > 0) { money -= bills; msg += " 💸 Despesas das empresas: ${brl(bills)}." }
-        val lojaMsg = stepLojas()
-        if (lojaMsg.isNotEmpty()) msg += " $lojaMsg"
-        if (money < 0) {
-            money = (money * 1.01).toInt()   // juros do banco sobre a dívida
-            debtDays += 1
-            msg += " 🏦 Você está no vermelho (${brl(money)}) há $debtDays dia(s)."
-            if (debtDays >= 5 || money < -150_000) bankrupt = true
-        } else {
-            debtDays = 0
-        }
-        if (garage.isEmpty() && houses.isEmpty() && companies.isEmpty() && money in 0..4999) {
+        if (garage.isEmpty() && money < 5000) {
             money = 5000
             msg += " Seu tio emprestou R$ 5.000 pra você recomeçar."
         }
-        refreshHouses()
         message = msg
         save()
     }
 
-    private fun genYards(rnd: Random): List<List<YardCar>> = List(5) { yi ->
+    private fun genYards(rnd: Random): List<List<YardCar>> = List(3) { yi ->
         val lo: Int
         val hi: Int
         val n: Int
         when (yi) {
             0 -> { lo = 0; hi = 60000; n = 5 }
             1 -> { lo = 20000; hi = 160000; n = 5 }
-            2 -> { lo = 100000; hi = Int.MAX_VALUE; n = 4 }
-            3 -> { lo = 0; hi = 40000; n = 4 }
-            else -> { lo = 40000; hi = 130000; n = 4 }
+            else -> { lo = 100000; hi = Int.MAX_VALUE; n = 4 }
         }
-        val mid = if (hi == Int.MAX_VALUE) lo else (lo + hi) / 2
         val pool = CATALOG.indices.filter { CATALOG[it].base in lo..hi }
-            .ifEmpty { CATALOG.indices.sortedBy { abs(CATALOG[it].base - mid) }.take(6) }
         List(n) {
             val mi = pool[rnd.nextInt(pool.size)]
             val m = CATALOG[mi]
@@ -398,7 +313,7 @@ class GameState(context: Context) {
 
     fun repairCost(car: OwnedCar, part: Int, to: Int): Int {
         val pts = max(0, to.coerceAtMost(MAX_COND) - car.cond[part])
-        return (pts * baseValue(car.model, car.year) * PART_COST[part] * shopDisc).roundToInt()
+        return (pts * baseValue(car.model, car.year) * PART_COST[part]).roundToInt()
     }
 
     fun repair(carId: Int, part: Int, to: Int) {
@@ -417,78 +332,36 @@ class GameState(context: Context) {
         save()
     }
 
-    /** Custo das peças de UMA tentativa do minigame (metade do preço de +10 pontos). */
-    fun mechanicCost(car: OwnedCar, part: Int): Int =
-        (repairCost(car, part, car.cond[part] + 10) * 0.5).roundToInt().let { if (ownShop) 0 else it.coerceAtLeast(20) }
-
-    /** Resultado de uma tentativa do minigame: cobra as peças e aplica os pontos ganhos (0 se errou). */
-    fun mechanicTry(carId: Int, part: Int, pts: Int): Boolean {
-        val car = garage.firstOrNull { it.id == carId } ?: return false
-        if (car.cond[part] >= MAX_COND) return false
-        val cost = mechanicCost(car, part)
-        if (cost > money) { message = "Sem dinheiro pras peças (${brl(cost)})."; return false }
-        money -= cost
-        tick(20)
-        update(carId) {
-            val l = it.cond.toMutableList()
-            l[part] = (l[part] + pts).coerceAtMost(MAX_COND)
-            it.copy(cond = l, spent = it.spent + cost)
-        }
-        save()
-        return true
-    }
-
-    fun buildShop() {
-        if (ownShop) return
-        if (money < SHOP_COST) { message = "Montar a empresa custa ${brl(SHOP_COST)}."; return }
-        money -= SHOP_COST
-        ownShop = true
-        message = "A Ferrovelho Motors é sua! Peças 30% mais baratas e oficina aberta 24h."
-        save()
-    }
-
-    /** Compra comida/bebida. Retorna true se deu certo. */
-    fun eat(f: Food): Boolean {
-        if (f.price > money) { message = "Sem dinheiro pra ${f.name} (${brl(f.price)})."; return false }
-        money -= f.price
-        tick(f.minutes)
-        hunger = (hunger + f.hunger).coerceAtMost(100.0)
-        thirst = (thirst + f.thirst).coerceAtMost(100.0)
-        save()
-        return true
-    }
-
     fun repairAllCost(car: OwnedCar): Int = PART_NAMES.indices.sumOf { repairCost(car, it, MAX_COND) }
 
     fun repairAll(carId: Int) {
         val car = garage.firstOrNull { it.id == carId } ?: return
         val cost = repairAllCost(car)
-        if (car.cond.all { it >= MAX_COND }) return
+        if (cost == 0) return
         if (cost > money) { message = "Dinheiro insuficiente pra reparar tudo (${brl(cost)})."; return }
         money -= cost
         tick(120)
         update(carId) { it.copy(cond = List(5) { MAX_COND }, spent = it.spent + cost) }
-        message = if (cost == 0) "Carro 100% revisado (de graça, a oficina é sua)." else "Carro 100% revisado por ${brl(cost)}."
+        message = "Carro 100% revisado por ${brl(cost)}."
         save()
     }
 
     fun tuningPrice(car: OwnedCar, t: Tuning): Int =
-        roundTo50(max(t.minPrice.toDouble(), baseValue(car.model, car.year) * t.pricePct) * shopDisc)
+        roundTo50(max(t.minPrice.toDouble(), baseValue(car.model, car.year) * t.pricePct))
 
     fun install(carId: Int, t: Tuning) {
         val car = garage.firstOrNull { it.id == carId } ?: return
         if (t.id in car.tuning) return
-        tuneBlock(CATALOG[car.model], t)?.let { message = "${t.name}: $it."; return }
         val price = tuningPrice(car, t)
         if (price > money) { message = "Dinheiro insuficiente."; return }
         money -= price
         tick(90)
         update(carId) { it.copy(tuning = it.tuning + t.id, spent = it.spent + price) }
-        message = if (price == 0) "Instalou ${t.name} (grátis, a oficina é sua)." else "Instalou ${t.name} por ${brl(price)}."
+        message = "Instalou ${t.name} por ${brl(price)}."
         save()
     }
 
-    fun paintCost(car: OwnedCar): Int = roundTo50(max(1200.0, baseValue(car.model, car.year) * 0.025) * shopDisc)
+    fun paintCost(car: OwnedCar): Int = roundTo50(max(1200.0, baseValue(car.model, car.year) * 0.025))
 
     fun paint(carId: Int, colorIdx: Int) {
         val car = garage.firstOrNull { it.id == carId } ?: return
@@ -498,7 +371,7 @@ class GameState(context: Context) {
         money -= cost
         tick(120)
         update(carId) { it.copy(color = colorIdx, spent = it.spent + cost) }
-        message = if (cost == 0) "Pintou de ${PAINTS[colorIdx].first} (grátis, a oficina é sua)." else "Pintou de ${PAINTS[colorIdx].first} por ${brl(cost)}."
+        message = "Pintou de ${PAINTS[colorIdx].first} por ${brl(cost)}."
         save()
     }
 
@@ -548,26 +421,6 @@ class GameState(context: Context) {
         o.put("slots", slots)
         o.put("sold", sold)
         o.put("profit", totalProfit)
-        o.put("meetDay", meetDay)
-        o.put("meetWins", meetWins)
-        o.put("meetBest", meetBest)
-        o.put("hunger", hunger)
-        o.put("thirst", thirst)
-        o.put("ownShop", ownShop)
-        o.put("companies", JSONArray().also { a -> companies.forEach { a.put(it) } })
-        o.put("houseSeq", houseSeq)
-        o.put("hSold", hSold)
-        o.put("nomes", JSONObject().also { j -> nomes.forEach { (k, v) -> j.put(k, v) } })
-        o.put("lojas", lojas.toJsonMap())
-        o.put("lojaPreco", lojaPreco.toJsonMap())
-        o.put("lojaUltimo", lojaUltimo.toJsonMap())
-        o.put("houseIdx", houseIdx)
-        o.put("houseTrend", houseTrend)
-        o.put("debtDays", debtDays)
-        o.put("bankrupt", bankrupt)
-        o.put("houses", JSONArray().also { a -> houses.forEach { a.put(it.toJson()) } })
-        o.put("houseMkt", JSONArray().also { a -> houseMarket.forEach { a.put(it.toJson()) } })
-        o.put("stock", JSONObject().also { j -> stock.forEach { (k, v) -> j.put(k, v) } })
         o.put("nextId", nextId)
         o.put("seed", seed)
         o.put("minutes", minutes)
@@ -604,12 +457,6 @@ class GameState(context: Context) {
             slots = o.getInt("slots")
             sold = o.getInt("sold")
             totalProfit = o.getInt("profit")
-            meetDay = o.optInt("meetDay", 0)
-            meetWins = o.optInt("meetWins", 0)
-            meetBest = o.optInt("meetBest", 0)
-            hunger = o.optDouble("hunger", 85.0)
-            thirst = o.optDouble("thirst", 85.0)
-            ownShop = o.optBoolean("ownShop", false)
             nextId = o.getInt("nextId")
             seed = o.getInt("seed")
             minutes = o.optInt("minutes", 8 * 60)
@@ -626,23 +473,7 @@ class GameState(context: Context) {
                 val a = ys.getJSONArray(yi)
                 List(a.length()) { a.getJSONObject(it).toYard() }
             }
-            if (yards.size < 3) throw IllegalStateException("save antigo")
-            if (yards.size < 5) yards = yards + genYards(Random(System.nanoTime())).drop(yards.size)
-            companies = o.optJSONArray("companies")?.let { a -> List(a.length()) { a.getInt(it) }.toSet() } ?: emptySet()
-            houseSeq = o.optInt("houseSeq", 1)
-            hSold = o.optInt("hSold", 0)
-            nomes = o.optJSONObject("nomes")?.let { j -> j.keys().asSequence().associateWith { j.getString(it) } } ?: emptyMap()
-            lojas = o.optJSONObject("lojas").toIntMap()
-            lojaPreco = o.optJSONObject("lojaPreco").toIntMap()
-            lojaUltimo = o.optJSONObject("lojaUltimo").toIntMap()
-            houseIdx = o.optDouble("houseIdx", 1.0)
-            houseTrend = o.optDouble("houseTrend", 0.0)
-            debtDays = o.optInt("debtDays", 0)
-            bankrupt = o.optBoolean("bankrupt", false)
-            houses = o.optJSONArray("houses")?.let { a -> List(a.length()) { a.getJSONObject(it).toHouse() } } ?: emptyList()
-            houseMarket = o.optJSONArray("houseMkt")?.let { a -> List(a.length()) { a.getJSONObject(it).toHouse() } } ?: emptyList()
-            stock = o.optJSONObject("stock")?.let { j -> j.keys().asSequence().associateWith { j.getInt(it) } } ?: emptyMap()
-            if (houseMarket.isEmpty()) refreshHouses()
+            if (yards.size != 3) throw IllegalStateException("save antigo")
             message = ""
         } catch (e: Exception) {
             newGame()
@@ -674,17 +505,3 @@ private fun JSONObject.toYard(): YardCar = YardCar(
     getInt("id"), getInt("model"), getInt("year"), getInt("color"),
     getJSONArray("cond").ints(), getInt("price"),
 )
-
-private fun House.toJson(): JSONObject = JSONObject()
-    .put("id", id).put("name", name).put("hood", hood).put("value", value)
-    .put("cond", cond).put("paid", paid).put("spent", spent)
-
-private fun JSONObject.toHouse(): House = House(
-    getInt("id"), getString("name"), getString("hood"), getInt("value"),
-    getInt("cond"), getInt("paid"), optInt("spent", 0),
-)
-
-private fun Map<Int, Int>.toJsonMap(): JSONObject = JSONObject().also { j -> forEach { (k, v) -> j.put(k.toString(), v) } }
-
-private fun JSONObject?.toIntMap(): Map<Int, Int> =
-    if (this == null) emptyMap() else keys().asSequence().associate { it.toInt() to getInt(it) }

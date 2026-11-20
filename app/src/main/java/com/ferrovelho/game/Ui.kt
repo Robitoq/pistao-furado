@@ -1,8 +1,6 @@
 package com.ferrovelho.game
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 
@@ -10,9 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,8 +39,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import kotlinx.coroutines.delay
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -72,19 +66,52 @@ private fun condColor(v: Int): Color = when {
 
 @Composable
 fun FerroVelhoApp(g: GameState) {
-    LaunchedEffect(Unit) { while (true) { delay(1000); g.clockTick() } }
-    Scaffold(topBar = { TopStatus(g) }) { pad ->
+    var tab by remember { mutableIntStateOf(0) }
+    var openCarId by remember { mutableStateOf<Int?>(null) }
+    var askReset by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = { TopStatus(g) },
+        bottomBar = {
+            NavigationBar {
+                val tabs = listOf("🚗" to "Ferro Velho", "🔧" to "Garagem", "📊" to "Resumo")
+                tabs.forEachIndexed { i, t ->
+                    NavigationBarItem(
+                        selected = tab == i,
+                        onClick = { tab = i; openCarId = null },
+                        icon = { Text(t.first, fontSize = 20.sp) },
+                        label = { Text(t.second) },
+                    )
+                }
+            }
+        },
+    ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (g.message.isNotEmpty()) MessageBar(g)
-            CityScreen(g)
+            when (tab) {
+                0 -> YardScreen(g)
+                1 -> {
+                    val car = g.garage.firstOrNull { it.id == openCarId }
+                    if (car != null) {
+                        CarScreen(g, car) { openCarId = null }
+                    } else {
+                        GarageScreen(g) { openCarId = it }
+                    }
+                }
+                else -> SummaryScreen(g) { askReset = true }
+            }
         }
     }
-    if (g.bankrupt) {
+
+    if (askReset) {
         AlertDialog(
-            onDismissRequest = {},
-            title = { Text("Você faliu!") },
-            text = { Text("As dívidas passaram do limite e o banco levou tudo. Você chegou ao dia ${g.day}, com ${g.sold} carros e ${g.hSold} casas vendidas. Dá pra recomeçar do zero.") },
-            confirmButton = { TextButton(onClick = { g.newGame() }) { Text("Recomeçar") } },
+            onDismissRequest = { askReset = false },
+            title = { Text("Reiniciar o jogo?") },
+            text = { Text("Você perde o dinheiro, os carros e o progresso atual.") },
+            confirmButton = {
+                TextButton(onClick = { askReset = false; openCarId = null; g.newGame() }) { Text("Reiniciar") }
+            },
+            dismissButton = { TextButton(onClick = { askReset = false }) { Text("Cancelar") } },
         )
     }
 }
@@ -97,17 +124,12 @@ private fun TopStatus(g: GameState) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(brl(g.money), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = if (g.money >= 0) GREEN else RED)
+                Text(brl(g.money), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = GREEN)
                 Text(g.dateText(), fontSize = 12.sp)
                 Text("Dia ${g.day} • mercado ${(g.marketIndex() * 100).roundToInt()}% ${g.trendArrow()}", fontSize = 12.sp)
                 g.event?.let { Text("${it.title} — ${it.text}", fontSize = 11.sp) }
             }
-            var snd by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Music.enabled) }
-            val sctx = androidx.compose.ui.platform.LocalContext.current
-            Text(
-                if (snd) "Som" else "Mudo", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { snd = Music.toggle(sctx.applicationContext) }.padding(end = 10.dp),
-            )
+            Button(onClick = { g.nextDay() }) { Text("Próximo dia ▶") }
         }
     }
 }
@@ -194,7 +216,7 @@ private fun CondBars(cond: List<Int>) {
 // ------------------------------------------------------------------ garagem
 
 @Composable
-fun GarageScreen(g: GameState, onOpen: (Int) -> Unit) {
+private fun GarageScreen(g: GameState, onOpen: (Int) -> Unit) {
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(12.dp),
@@ -212,7 +234,7 @@ fun GarageScreen(g: GameState, onOpen: (Int) -> Unit) {
             }
         }
         if (g.garage.isEmpty()) {
-            item { Text("Garagem vazia. Vai no Ferro Velho comprar um carro!") }
+            item { Text("Garagem vazia. Vai no Ferro Velho comprar um carro! 🚗") }
         }
         items(g.garage, key = { it.id }) { car ->
             val m = CATALOG[car.model]
@@ -247,10 +269,9 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-fun CarScreen(g: GameState, car: OwnedCar, onCity: () -> Unit, onBack: () -> Unit) {
+private fun CarScreen(g: GameState, car: OwnedCar, onBack: () -> Unit) {
     val m = CATALOG[car.model]
     val invested = car.paid + car.spent
-    var haggle by remember { mutableStateOf<Haggle?>(null) }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -264,23 +285,88 @@ fun CarScreen(g: GameState, car: OwnedCar, onCity: () -> Unit, onBack: () -> Uni
             fontSize = 13.sp,
         )
 
-        SectionTitle("🔧 Oficina")
-        Text(
-            "Conserto, tuning e pintura agora são feitos na oficina, lá na cidade.",
-            fontSize = 13.sp,
-        )
-        Button(onClick = onCity, modifier = Modifier.fillMaxWidth()) { Text("Ir até a oficina") }
+        SectionTitle("🔧 Reparos")
+        PART_NAMES.forEachIndexed { i, name ->
+            val v = car.cond[i]
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(name, Modifier.width(84.dp), fontSize = 13.sp)
+                    LinearProgressIndicator(
+                        progress = { v / 100f },
+                        modifier = Modifier.weight(1f).height(8.dp),
+                        color = condColor(v),
+                    )
+                    Text("$v%", Modifier.width(44.dp), fontSize = 12.sp, textAlign = TextAlign.End)
+                }
+                if (v < MAX_COND) {
+                    Row(Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val up = min(MAX_COND, v + 10)
+                        OutlinedButton(onClick = { g.repair(car.id, i, up) }) {
+                            Text("+${up - v} · ${brl(g.repairCost(car, i, up))}", fontSize = 12.sp)
+                        }
+                        FilledTonalButton(onClick = { g.repair(car.id, i, MAX_COND) }) {
+                            Text("100% · ${brl(g.repairCost(car, i, MAX_COND))}", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+        if (g.repairAllCost(car) > 0) {
+            Button(onClick = { g.repairAll(car.id) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Reparar tudo · ${brl(g.repairAllCost(car))}")
+            }
+        }
 
-        SectionTitle("💰 Vender")
-        Button(
-            onClick = {
-                if (g.minutes >= 22 * 60) g.message = "Já é noite, ninguém aparece. Passe pro próximo dia"
-                else { g.spendTime(30); haggle = newHaggle(g, car) }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Atender um comprador") }
-        haggle?.let { h ->
-            BuyerDialog(h, invested, { p -> g.sell(car.id, Offer(h.type, "", p)); haggle = null }, { haggle = null })
+        SectionTitle("🎛️ Tuning")
+        TUNINGS.forEach { t ->
+            val has = t.id in car.tuning
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(t.name, Modifier.weight(1f), fontSize = 14.sp)
+                if (has) {
+                    Text("instalado ✓", color = GREEN, fontSize = 13.sp)
+                } else {
+                    OutlinedButton(onClick = { g.install(car.id, t) }) {
+                        Text(brl(g.tuningPrice(car, t)), fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        SectionTitle("🎨 Pintura (${brl(g.paintCost(car))})")
+        PAINTS.chunked(7).forEachIndexed { row, chunk ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                chunk.forEachIndexed { j, p ->
+                    val idx = row * 7 + j
+                    val selected = idx == car.color
+                    Spacer(
+                        Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(p.second))
+                            .border(if (selected) 3.dp else 1.dp, if (selected) Color.White else Color.Gray, CircleShape)
+                            .clickable { g.paint(car.id, idx) },
+                    )
+                }
+            }
+        }
+
+        SectionTitle("💰 Vender (as ofertas mudam a cada dia)")
+        g.offers(car).forEach { o ->
+            val profit = o.price - invested
+            Card(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(o.buyer, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(o.note, fontSize = 11.sp)
+                        Text(
+                            if (profit >= 0) "lucro ${brl(profit)}" else "prejuízo ${brl(-profit)}",
+                            fontSize = 12.sp,
+                            color = if (profit >= 0) GREEN else RED,
+                        )
+                    }
+                    Button(onClick = { g.sell(car.id, o) }) { Text("Vender ${brl(o.price)}", fontSize = 13.sp) }
+                }
+            }
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -289,7 +375,7 @@ fun CarScreen(g: GameState, car: OwnedCar, onCity: () -> Unit, onBack: () -> Uni
 // ------------------------------------------------------------------ resumo
 
 @Composable
-fun SummaryScreen(g: GameState, onReset: () -> Unit) {
+private fun SummaryScreen(g: GameState, onReset: () -> Unit) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -309,11 +395,12 @@ fun SummaryScreen(g: GameState, onReset: () -> Unit) {
 
         SectionTitle("Como jogar")
         Text(
-            "1. Ande pela cidade e fale com os vendedores dos ferros-velhos pra comprar carros baratos.\n" +
-                "2. Conserte, tune e pinte na oficina da cidade. Cada peça pesa diferente no valor.\n" +
-                "3. Venda pela garagem (botão 🚗 Garagem) ou monte sua própria revendedora.\n" +
-                "4. Compre os terrenos à venda no mapa e abra empresas: revendedora de carros e imobiliária.\n" +
-                "5. Durma em casa pra passar o dia: o mercado e os ferros-velhos renovam.",
+            "1. Compre carros baratos nos ferros-velhos (olhe quanto ele \"vale hoje\").\n" +
+                "2. Na garagem, abra a oficina e conserte as peças. Cada peça pesa diferente no valor.\n" +
+                "3. Tune e pinte: cada comprador valoriza uma coisa (tunador paga por tuning, " +
+                "colecionador paga por clássico).\n" +
+                "4. Compare as ofertas e venda. Se nenhuma agradar, passe o dia e veja novas ofertas.\n" +
+                "5. Junte grana e vá pro Pátio Premium comprar esportivo.",
             fontSize = 14.sp,
         )
 
@@ -336,99 +423,6 @@ private fun MarketChart(h: List<Double>) {
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             drawPath(path, line, style = Stroke(4f))
-        }
-    }
-}
-
-
-// ------------------------------------------------------------------ cards bonitos (reparo / tuning)
-
-val PART_ICONS = listOf("⚙️", "🚪", "🛞", "💺", "🔩")
-
-@Composable
-fun RepairCard(g: GameState, car: OwnedCar, i: Int, name: String) {
-    val v = car.cond[i]
-    val (label, col) = when {
-        v < 25 -> "Péssimo" to RED
-        v < 50 -> "Ruim" to Color(0xFFFF9800)
-        v < 75 -> "Regular" to Color(0xFFFFCA28)
-        v < 95 -> "Bom" to Color(0xFF9CCC65)
-        else -> "Ótimo" to GREEN
-    }
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
-    androidx.compose.material3.Card(
-        shape = shape,
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color(0xFF2A2733)),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(col.copy(alpha = 0.18f)).border(1.5.dp, col, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) { Text(PART_ICONS.getOrElse(i) { "" }, fontSize = 18.sp) }
-                Column(Modifier.weight(1f)) {
-                    Text(name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text(label, color = col, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                }
-                Text("$v%", color = col, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            }
-            Box(Modifier.fillMaxWidth().height(10.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp)).background(Color(0xFF14121A))) {
-                Box(
-                    Modifier.fillMaxWidth(v.coerceIn(0, 100) / 100f).fillMaxHeight()
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
-                        .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(col.copy(alpha = 0.7f), col))),
-                )
-            }
-            if (v < MAX_COND) {
-                val up = min(MAX_COND, v + 10)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(
-                        onClick = { g.repair(car.id, i, up) }, Modifier.weight(1f),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                    ) { Text("+${up - v}  ${brl(g.repairCost(car, i, up))}", fontSize = 12.sp) }
-                    Button(
-                        onClick = { g.repair(car.id, i, MAX_COND) }, Modifier.weight(1f),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                    ) { Text("100%  ${brl(g.repairCost(car, i, MAX_COND))}", fontSize = 12.sp) }
-                }
-            } else {
-                Text("Perfeito", color = GREEN, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
-
-@Composable
-fun TuningCard(g: GameState, car: OwnedCar, t: Tuning, modifier: Modifier) {
-    val has = t.id in car.tuning
-    val block = tuneBlock(CATALOG[car.model], t)
-    val accent = if (has) GREEN else Color(0xFFB39DDB)
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
-    val emoji = t.name.takeWhile { !it.isLetter() }.trim()
-    val title = t.name.dropWhile { !it.isLetter() }
-    androidx.compose.material3.Card(
-        shape = shape,
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color(0xFF2A2733)),
-        modifier = modifier.border(1.5.dp, if (has) GREEN else Color(0x33FFFFFF), shape),
-    ) {
-        Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(emoji, fontSize = 26.sp)
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center, minLines = 2, maxLines = 2)
-            Text("+${(t.valuePct * 100).roundToInt()}% valor", color = accent, fontSize = 11.sp)
-            if (has) {
-                Text("Instalado", color = GREEN, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            } else if (block != null) {
-                Text("$block", color = Color(0xFFEF9A9A), fontSize = 11.sp, textAlign = TextAlign.Center)
-            } else {
-                FilledTonalButton(
-                    onClick = { g.install(car.id, t) },
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                ) { Text(brl(g.tuningPrice(car, t)), fontSize = 12.sp) }
-            }
         }
     }
 }
