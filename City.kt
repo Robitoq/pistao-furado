@@ -38,17 +38,18 @@ import androidx.compose.ui.window.Dialog
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
 // ------------------------------------------------------------ mundo
 
-private const val WORLD = 5000f
-private const val VIEW_W = 190f
+private const val WORLD = WORLD_END
+const val VIEW_W = 190f
 private val YARD_X = listOf(520f, 1450f, 2450f, 3500f, 4450f)
 private const val HOME_X = 260f     // casa do personagem
 private const val MEET_X = 2000f    // encontro de carros
-private val NEW_PLACES = listOf(HOME_X, MEET_X)
+private val NEW_PLACES = listOf(HOME_X, MEET_X, GARAGE_X) + STORE_X + COMPANY_X + LOJA_X + DRAG_X + PROP_X + CLUB_X
 private val PLACE_X = YARD_X + NEW_PLACES
 
 val CSKIN = listOf(0xFFFFDBB4, 0xFFF1C27D, 0xFFE0AC69, 0xFFC68642, 0xFF8D5524, 0xFF6B4423, 0xFF4A2C17).map { Color(it) }
@@ -92,10 +93,14 @@ private fun saveProfile(p: SharedPreferences, c: PlayerProfile) {
         .putBoolean("glasses", l.glasses).apply()
 }
 
+const val BLD_N = 16
+
 class CitySprites(
-    val bld: List<ImageBitmap>, val tree: List<ImageBitmap>, val lamp: ImageBitmap,
-    val sign: List<ImageBitmap>, val cars: List<ImageBitmap>, val win: List<ImageBitmap>,
+    val bld: List<ImageBitmap>, val tree: List<ImageBitmap>, val lamp: List<ImageBitmap>,
+    val sign: List<ImageBitmap>, val veh: VehSet, val win: List<ImageBitmap>,
     val tl: ImageBitmap, val bench: ImageBitmap,
+    val busStop: ImageBitmap, val phone: ImageBitmap, val cart: ImageBitmap,
+    val walk: List<ImageBitmap>, val road: ImageBitmap,
 ) {
     companion object {
         private var cache: CitySprites? = null
@@ -108,61 +113,63 @@ class CitySprites(
                 android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
             }
             return CitySprites(
-                List(12) { img("b$it") }, List(2) { img("t$it") }, img("lamp"),
-                List(3) { img("sign$it") }, List(9) { img("car${it + 1}") }, List(12) { img("w$it") },
+                List(BLD_N) { img("b$it") }, List(3) { img("t$it") }, List(2) { img("lamp$it") },
+                List(3) { img("sign$it") }, loadVehicles(ctx), List(BLD_N) { img("w$it") },
                 img("tl"), img("bench"),
+                img("busstop"), img("phone"), img("cart"),
+                List(2) { img("walk$it") }, img("road0"),
             )
         }
     }
 }
 
-fun carSpriteFor(b: Body): Int = when (b) {
-    Body.BOXY -> 0; Body.COMPACT -> 1; Body.WAGON -> 2; Body.MPV -> 4; Body.HATCH -> 1
-    Body.SEDAN -> 5; Body.SUV -> 6; Body.PICKUP -> 8; Body.COUPE -> 3; Body.CLASSIC -> 7
-    Body.VAN -> 4; Body.BEETLE -> 1; Body.SUPER -> 3
-    else -> 5
-}
+/** carroceria do catálogo -> sprite de veículo (ver Vehicles.kt) */
+fun carSpriteFor(b: Body): Int = vehicleFor(b)
 
-// centros das rodas (x1, x2, raio) de cada sprite de carro
-val CAR_WHEELS = listOf(
-    Triple(16f, 52f, 4.5f), Triple(12f, 43f, 5f), Triple(16f, 52f, 4.5f), Triple(15.5f, 47.5f, 4.5f),
-    Triple(16f, 47f, 5f), Triple(18f, 54f, 5f), Triple(12f, 46f, 5f), Triple(17f, 50f, 4.5f), Triple(11f, 38f, 5f),
-)
-
-// kind: 0 prédio, 1 árvore, 2 poste, 3 placa, 4 semáforo, 5 banco
+// kind: 0 prédio, 1 árvore, 2 poste, 3 placa, 4 semáforo, 5 banco, 6 lixeira, 7 saco, 8 gato, 9 vaso, 10 ponto de ônibus, 11 orelhão, 12 carrinho
 private class Item(val kind: Int, val idx: Int, val x: Float)
 private class Ped(val look: Look, val base: Float, val phase: Float)
-private class Traffic(val spr: Int, val x0: Float, val speed: Float, val lane: Int, val driver: Look)
+/** Carro do trânsito: tem estado (posição/velocidade) e mantém distância do da frente. lane 0 = vai pra direita (faixa de cima), 1 = esquerda (faixa de baixo). */
+private class Traffic(
+    val spr: Int, val lane: Int, var x: Float, val v0: Float, val driver: Look,
+    val color: Int, val cond: List<Int>, val len: Float,
+) {
+    var v: Float = v0
+    var dist: Float = 0f
+}
+
+/** desgaste dos carros do ferro-velho (lataria destruída, pneu gasto) */
+private val JUNK_COND = listOf(30, 12, 40, 40, 40)
 
 private fun genCity(spr: CitySprites): List<Item> {
     val r = Random(11)
     val out = ArrayList<Item>()
     var x = 20f
-    while (x < WORLD - 100f) {
+    while (x < CITY_END - 100f) {
         val yx = PLACE_X.firstOrNull { x + 80f > it - 110f && x < it + 110f }
         if (yx != null) { x = yx + 110f; continue }
         if (r.nextInt(100) < 18) {
-            out.add(Item(1, r.nextInt(2), x + 10f)); out.add(Item(1, r.nextInt(2), x + 45f))
+            out.add(Item(1, r.nextInt(3), x + 10f)); out.add(Item(1, r.nextInt(3), x + 45f))
             if (r.nextBoolean()) out.add(Item(3, r.nextInt(3), x + 70f))
             x += 100f
         } else {
-            val i = r.nextInt(12)
+            val i = r.nextInt(BLD_N)
             out.add(Item(0, i, x))
             x += spr.bld[i].width + r.nextInt(4, 24)
         }
     }
     var lx = 60f
-    while (lx < WORLD) { out.add(Item(2, 0, lx)); lx += 95f + r.nextInt(55) }
+    while (lx < WORLD) { out.add(Item(2, if (r.nextInt(3) == 0) 1 else 0, lx)); lx += 95f + r.nextInt(55) }
     var k = 0
-    while (350f + 700f * k < WORLD) { out.add(Item(4, 0, 350f + 700f * k)); k++ }
+    while (350f + 700f * k < CITY_END) { out.add(Item(4, 0, 350f + 700f * k)); k++ }
     k = 0
     while (200f + 430f * k < WORLD) { out.add(Item(5, 0, 200f + 430f * k)); k++ }
     // lixeira, saco de lixo, gato e vaso espalhados pela calçada
     var pxx = 90f
-    while (pxx < WORLD - 60f) {
+    while (pxx < CITY_END - 60f) {
         pxx += 55f + r.nextInt(110)
         if (PLACE_X.any { abs(pxx - it) < 100f }) continue
-        out.add(Item(6 + r.nextInt(4), r.nextInt(2), pxx))
+        out.add(Item(6 + r.nextInt(7), r.nextInt(2), pxx))
     }
     // sem banco nem semáforo em cima da casa e do encontro
     out.removeAll { (it.kind == 4 || it.kind == 5) && NEW_PLACES.any { p -> abs(it.x - p) < 75f } }
@@ -170,7 +177,7 @@ private fun genCity(spr: CitySprites): List<Item> {
 }
 
 /** Número "aleatório" estável a partir de um inteiro (pra variar o cenário sem piscar). */
-private fun hsh(a: Int): Int {
+fun hsh(a: Int): Int {
     var x = a * -1640531535
     x = x xor (x ushr 15)
     x *= 0x2c1b3c6d
@@ -178,7 +185,7 @@ private fun hsh(a: Int): Int {
     return x and 0x7fffffff
 }
 
-private fun nightF(m: Int): Float = when {
+fun nightF(m: Int): Float = when {
     m < 5 * 60 -> 1f
     m < 7 * 60 -> (7 * 60 - m) / 120f
     m < 18 * 60 -> 0f
@@ -188,73 +195,31 @@ private fun nightF(m: Int): Float = when {
 
 // ------------------------------------------------------------ desenho
 
-private fun DrawScope.wr(c: Color, x: Float, y: Float, w: Float, h: Float, cam: Float, s: Float) {
+fun DrawScope.wr(c: Color, x: Float, y: Float, w: Float, h: Float, cam: Float, s: Float) {
     drawRect(c, Offset((x - cam) * s, y * s), Size(w * s, h * s))
 }
 
-fun DrawScope.drawWheels(ci: Int, left: Float, top: Float, u: Float, h: Float, rot: Float, sport: Boolean = false) {
-    val wh = CAR_WHEELS[ci.coerceIn(0, CAR_WHEELS.lastIndex)]
-    for (cx in listOf(wh.first, wh.second)) {
-        val c = Offset(left + cx * u, top + (h - 5.5f) * u)
-        val r = wh.third * u
-        drawCircle(Color(0xFF15161A), r, c)
-        drawCircle(if (sport) Color(0xFFFFC107) else Color(0xFF8E9399), r * (if (sport) 0.75f else 0.62f), c)
-        if (sport) drawCircle(Color(0xFF3A2E00), r * 0.58f, c)
-        val n = if (sport) 6 else 5
-        for (j in 0 until n) {
-            val a = rot + j * (6.2832f / n)
-            drawLine(if (sport) Color(0xFFFFE082) else Color(0xFF4A4F57), c, Offset(c.x + cos(a) * r * 0.62f, c.y + sin(a) * r * 0.62f), r * (if (sport) 0.2f else 0.16f))
-        }
-        drawCircle(if (sport) Color(0xFF5D4B00) else Color(0xFFD7DBE0), r * 0.2f, c)
-    }
-}
-
-// posição da cabeça do motorista em cada sprite (x do centro, y do topo), na janela
-val DRIVER_POS_PUBLIC get() = DRIVER_POS
-private val DRIVER_POS = listOf(
-    33f to 2.8f, 27f to 3f, 34f to 3.2f, 33f to 3.6f, 30f to 3f, 33f to 4f, 30f to 7.5f, 32f to 4f, 25f to 3.2f,
-)
-
-fun DrawScope.drawDriver(l: Look, ci: Int, left: Float, top: Float, u: Float) {
-    val p = DRIVER_POS[ci.coerceIn(0, DRIVER_POS.lastIndex)]
-    val x = left + (p.first - 2f) * u
-    val y = top + p.second * u
-    val dark = Color(0xFF212121)
-    drawRect(CTOP[l.top], Offset(x - 0.8f * u, y + 4f * u), Size(5.6f * u, 2f * u))
-    drawRect(CSKIN[l.skin], Offset(x + 1.2f * u, y + 3.6f * u), Size(1.6f * u, 0.6f * u))
-    drawRect(CSKIN[l.skin], Offset(x, y), Size(4f * u, 4f * u))
-    when (l.hairStyle) {
-        3 -> {}
-        5 -> {
-            drawRect(CTOP[l.top], Offset(x - 0.2f * u, y - 0.8f * u), Size(4.4f * u, 1.6f * u))
-            drawRect(dark, Offset(x + 3.4f * u, y + 0.2f * u), Size(1.8f * u, 0.6f * u))
-        }
-        else -> drawRect(CHAIR[l.hair], Offset(x - 0.2f * u, y - 0.8f * u), Size(4.4f * u, 1.8f * u))
-    }
-    if (l.hairStyle == 1) drawRect(CHAIR[l.hair], Offset(x - 0.6f * u, y), Size(1f * u, 4.6f * u))
-    drawRect(dark, Offset(x + 2.6f * u, y + 1.7f * u), Size(0.8f * u, 1f * u))
-    if (l.glasses) drawRect(dark, Offset(x + 2f * u, y + 1.4f * u), Size(2.2f * u, 0.4f * u))
-}
-
-private fun DrawScope.sp(
+/**
+ * Desenha um sprite estático (prédio, árvore, poste...). wx/by em unidades do mundo (by = chão do sprite).
+ * Posição e tamanho são ARREDONDADOS (antes eram truncados: o sprite "tremia" e os pixels ficavam desiguais).
+ * Os veículos NÃO usam esta função: eles usam drawVehWorld (Vehicles.kt).
+ */
+fun DrawScope.sp(
     img: ImageBitmap, wx: Float, by: Float, cam: Float, s: Float,
     k: Float = 1f, flip: Boolean = false, tint: Color? = null, alpha: Float = 1f,
-    carIdx: Int = -1, rot: Float = 0f, driver: Look? = null,
 ) {
-    val w = img.width * k * s
-    val h = img.height * k * s
-    val dx = (wx - cam) * s
-    val dy = by * s - h
-    if (dx + w < 0f || dx > size.width) return
+    val x0 = ((wx - cam) * s).roundToInt()
+    val x1 = ((wx - cam + img.width * k) * s).roundToInt()
+    val y1 = (by * s).roundToInt()
+    val y0 = ((by - img.height * k) * s).roundToInt()
+    if (x1 < 0 || x0 > size.width) return
     val filter = tint?.let { ColorFilter.tint(it, BlendMode.SrcAtop) }
     val body: DrawScope.() -> Unit = {
-        drawImage(img, IntOffset.Zero, IntSize(img.width, img.height), IntOffset(dx.toInt(), dy.toInt()),
-            IntSize(w.toInt().coerceAtLeast(1), h.toInt().coerceAtLeast(1)), alpha,
+        drawImage(img, IntOffset.Zero, IntSize(img.width, img.height), IntOffset(x0, y0),
+            IntSize((x1 - x0).coerceAtLeast(1), (y1 - y0).coerceAtLeast(1)), alpha,
             androidx.compose.ui.graphics.drawscope.Fill, filter, BlendMode.SrcOver, FilterQuality.None)
-        if (carIdx >= 0) drawWheels(carIdx, dx, dy, k * s, img.height.toFloat(), rot)
-        if (driver != null && carIdx >= 0) drawDriver(driver, carIdx, dx, dy, k * s)
     }
-    if (flip) withTransform({ scale(-1f, 1f, Offset(dx + w / 2f, dy)) }) { body() } else body()
+    if (flip) withTransform({ scale(-1f, 1f, Offset((x0 + x1) / 2f, 0f)) }) { body() } else body()
 }
 
 /** Boneco 12x26 unidades. left/top em px, c = px por unidade. walk 0..1 (andando), ph = fase da animação. */
@@ -290,14 +255,19 @@ fun DrawScope.drawChar(l: Look, left: Float, top: Float, c: Float, faceLeft: Boo
     if (bot == 2) r(botC, 2.6f, 16.5f, 6.8f, 4f)
     // braços
     val sleeve = when (l.topType) { 0 -> 3f; 1 -> 0f; else -> 7f }
-    for ((ax, off) in listOf(1.2f to sw * 1.6f, 9f to -sw * 1.6f)) {
-        r(skin, ax, 9.3f + off, 1.8f, 7.5f)
-        if (sleeve > 0f) r(topC, ax, 9.3f + off, 1.8f, sleeve)
+    val aw = if (l.female) 1.5f else 1.8f
+    for ((ax0, off) in listOf(1.2f to sw * 1.6f, 9f to -sw * 1.6f)) {
+        val ax = if (l.female) ax0 + (if (ax0 < 5f) 0.4f else -0.1f) else ax0
+        r(skin, ax, 9.3f + off, aw, 7.5f)
+        if (sleeve > 0f) r(topC, ax, 9.3f + off, aw, sleeve)
     }
     // tronco
-    val tx = if (l.female) 3.3f else 3f
-    val tw = if (l.female) 5.4f else 6f
-    r(topC, tx, 9f, tw, 8f)
+    val tx = if (l.female) 3.7f else 3f
+    val tw = if (l.female) 4.6f else 6f
+    if (l.female) {
+        r(topC, 3.2f, 9f, 5.6f, 4.2f)      // busto/ombros
+        r(topC, tx, 13.2f, tw, 3.8f)       // cintura fina
+    } else r(topC, tx, 9f, tw, 8f)
     if (l.topType == 2) { r(Color(0x55000000), 5.8f, 9f, 0.4f, 8f); r(Color(0x33FFFFFF), tx, 9f, tw, 1.2f) }
     if (bot != 2) r(Color(0xFF212121), tx, 16.3f, tw, 0.8f)
     r(skin, 5f, 8f, 2f, 1.3f)
@@ -305,7 +275,17 @@ fun DrawScope.drawChar(l: Look, left: Float, top: Float, c: Float, faceLeft: Boo
     r(skin, 3f, 2f, 6f, 6.2f)
     r(Color(0xFF212121), 4.5f, 4.7f, 1.1f, 1.4f)
     r(Color(0xFF212121), 6.9f, 4.7f, 1.1f, 1.4f)
-    r(if (l.female) Color(0xFFC2185B) else Color(0xFF8D4B3B), 5.6f, 6.7f, 1.8f, 0.5f)
+    if (l.female) {
+        val dk = Color(0xFF212121)
+        r(dk, 4.2f, 4.3f, 1.7f, 0.45f); r(dk, 6.6f, 4.3f, 1.7f, 0.45f)   // cílios
+        r(dk, 3.9f, 4.6f, 0.4f, 0.5f); r(dk, 8.3f, 4.6f, 0.4f, 0.5f)
+        r(hairC, 4.3f, 3.7f, 1.6f, 0.35f); r(hairC, 6.6f, 3.7f, 1.6f, 0.35f) // sobrancelha fina
+        r(Color(0x66FF6F91), 3.5f, 5.9f, 1.3f, 0.9f); r(Color(0x66FF6F91), 7.2f, 5.9f, 1.3f, 0.9f) // blush
+        r(Color(0xFFD81B60), 5.3f, 6.6f, 2.4f, 0.8f)                      // batom
+        r(Color(0xFFFFD54F), 2.7f, 5.8f, 0.6f, 1f); r(Color(0xFFFFD54F), 8.7f, 5.8f, 0.6f, 1f) // brincos
+    } else {
+        r(Color(0xFF8D4B3B), 5.6f, 6.7f, 1.8f, 0.5f)
+    }
     when (l.hairStyle) {
         0, 4 -> { r(hairC, 2.6f, 0.8f, 6.8f, 2.4f); r(hairC, 2.6f, 2.6f, 1f, 2.2f); r(hairC, 8.4f, 2.6f, 1f, 2.2f) }
         1 -> r(hairC, 2.6f, 0.8f, 6.8f, 2.6f)
@@ -324,7 +304,7 @@ fun DrawScope.drawChar(l: Look, left: Float, top: Float, c: Float, faceLeft: Boo
     }
 }
 
-private fun DrawScope.label(p: Paint, txt: String, wx: Float, y: Float, cam: Float, s: Float, sz: Float, col: Int) {
+fun DrawScope.label(p: Paint, txt: String, wx: Float, y: Float, cam: Float, s: Float, sz: Float, col: Int) {
     p.textSize = sz * s
     p.textAlign = Paint.Align.CENTER
     val nc = drawContext.canvas.nativeCanvas
@@ -350,17 +330,41 @@ private val PED_LINES = listOf(
 )
 
 private fun DrawScope.bubble(p: Paint, txt: String, wx: Float, bottomY: Float, cam: Float, s: Float) {
-    p.textSize = 5.2f * s
-    val tw = p.measureText(txt) / s
-    val bw = tw + 6f
-    // o balão não sai da tela; o biquinho continua apontando pra quem fala
-    val cxw = wx.coerceIn(cam + bw / 2f + 1.5f, cam + VIEW_W - bw / 2f - 1.5f)
-    val x = cxw - bw / 2f
-    val tail = wx.coerceIn(x + 3f, x + bw - 3f)
-    wr(Color(0xFF212121), x - 0.6f, bottomY - 10.6f, bw + 1.2f, 10.2f, cam, s)
-    wr(Color(0xFFFFFFFF), x, bottomY - 10f, bw, 9f, cam, s)
-    wr(Color(0xFFFFFFFF), tail - 1.5f, bottomY - 1f, 3f, 2f, cam, s)
-    label(p, txt, cxw, bottomY - 3.4f, cam, s, 5.2f, 0xFF212121.toInt())
+    try {
+        p.textSize = 5.2f * s
+        // largura máxima do balão: nunca maior que a tela (senão o coerceIn quebra e o jogo fecha)
+        val maxTw = VIEW_W - 16f
+        val words = txt.split(' ').filter { it.isNotEmpty() }
+        val lines = ArrayList<String>()
+        var curLine = ""
+        for (w in words) {
+            val test = if (curLine.isEmpty()) w else "$curLine $w"
+            if (curLine.isNotEmpty() && p.measureText(test) / s > maxTw) { lines.add(curLine); curLine = w }
+            else curLine = test
+        }
+        if (curLine.isNotEmpty()) lines.add(curLine)
+        if (lines.isEmpty()) return
+        if (lines.size > 3) { while (lines.size > 3) lines.removeAt(lines.lastIndex) }
+        var tw = 0f
+        for (l in lines) tw = max(tw, p.measureText(l) / s)
+        val bw = (tw + 6f).coerceAtMost(VIEW_W - 4f)
+        val lh = 6.4f
+        val bh = 3f + lh * lines.size
+        // o balão não sai da tela; o biquinho continua apontando pra quem fala
+        val lo = cam + bw / 2f + 1.5f
+        val hi = max(lo, cam + VIEW_W - bw / 2f - 1.5f)
+        val cxw = wx.coerceIn(lo, hi)
+        val x = cxw - bw / 2f
+        val tail = wx.coerceIn(x + 3f, max(x + 3f, x + bw - 3f))
+        wr(Color(0xFF212121), x - 0.6f, bottomY - bh - 1.6f, bw + 1.2f, bh + 1.2f, cam, s)
+        wr(Color(0xFFFFFFFF), x, bottomY - bh - 1f, bw, bh, cam, s)
+        wr(Color(0xFFFFFFFF), tail - 1.5f, bottomY - 1f, 3f, 2f, cam, s)
+        for ((i, l) in lines.withIndex()) {
+            label(p, l, cxw, bottomY - bh + 3.4f + lh * i, cam, s, 5.2f, 0xFF212121.toInt())
+        }
+    } catch (_: Throwable) {
+        // balão é só enfeite: se der qualquer problema, não desenha e o jogo continua
+    }
 }
 
 fun DrawScope.glow(center: Offset, radius: Float, c: Color) {
@@ -522,13 +526,38 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     val city = remember(spr) { genCity(spr) }
     val lamps = remember(city) { city.filter { it.kind == 2 }.map { it.x } }
     val peds = remember {
-        List(22) { val r = Random(it + 5); Ped(randomLook(r), r.nextFloat() * WORLD, r.nextFloat() * 6f) }
+        List(80) { val r = Random(it + 5); Ped(randomLook(r), r.nextFloat() * WORLD, r.nextFloat() * 6f) }
     }
     val traffic = remember {
-        List(14) {
+        val per = 22
+        val slot = WORLD / per
+        List(per * 2) {
             val r = Random(it + 40)
             val lane = it % 2
-            Traffic(r.nextInt(9), r.nextFloat() * WORLD, (25 + r.nextInt(25)) * (if (lane == 0) 1f else -1f), lane, randomLook(r))
+            val j = it / 2
+            val roll = r.nextInt(100)
+            val sp = when {
+                roll < 9 -> V_TAXI
+                roll < 17 -> if (r.nextBoolean()) V_MOTO else V_MOTO_ENTREGA
+                roll < 23 -> if (r.nextBoolean()) V_TRUCK_BAU else V_TRUCK_MADEIRA
+                roll < 28 -> V_BUS
+                else -> r.nextInt(V_GARAGE)
+            }
+            val v0 = when (sp) {
+                V_BUS -> 24f + r.nextInt(8)
+                V_TRUCK_BAU, V_TRUCK_MADEIRA -> 22f + r.nextInt(8)
+                V_MOTO, V_MOTO_ENTREGA -> 38f + r.nextInt(18)
+                else -> 26f + r.nextInt(24)
+            }
+            val col = when (sp) {
+                V_TAXI -> 7
+                V_BUS -> intArrayOf(5, 6, 0, 4)[r.nextInt(4)]
+                V_TRUCK_BAU, V_TRUCK_MADEIRA -> intArrayOf(0, 5, 4, 6, 2)[r.nextInt(5)]
+                else -> r.nextInt(PAINTS.size)
+            }
+            val lat = intArrayOf(100, 100, 100, 85, 60, 35)[r.nextInt(6)]
+            // um carro por "fatia" da pista (com folga): ninguém nasce em cima de ninguém
+            Traffic(sp, lane, j * slot + r.nextFloat() * slot * 0.5f, v0, randomLook(r), col, listOf(100, lat, 100, 100, 100), vehLen(sp))
         }
     }
     val stars = remember { val r = Random(3); List(70) { Offset(r.nextFloat(), r.nextFloat()) } }
@@ -548,6 +577,33 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var sleeping by remember { mutableStateOf(false) }
     var sleepTaxi by remember { mutableStateOf(false) }
     var lateAsk by remember { mutableStateOf(false) }
+    var garageDlg by remember { mutableStateOf(false) }
+    var garageListDlg by remember { mutableStateOf(false) }
+    var summaryDlg by remember { mutableStateOf(false) }
+    var jobDlg by remember { mutableStateOf(false) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var ownedProps by remember { mutableStateOf(loadProps(ctx)) }
+    var propDlg by remember { mutableStateOf<Int?>(null) }
+    var clubInside by remember { mutableStateOf(false) }
+    val nearClub by remember { derivedStateOf { abs(px - CLUB_X) < 55f } }
+    var propInside by remember { mutableStateOf<Int?>(null) }
+    var wakeX by remember { mutableFloatStateOf(HOME_X + 30f) }
+    val nearProp by remember { derivedStateOf { PROP_X.indexOfFirst { abs(px - it) < 45f } } }
+    var bizDlg by remember { mutableStateOf<Int?>(null) }
+    var driveId by remember { mutableStateOf<Int?>(null) }
+    var zoneDlg by remember { mutableStateOf<Int?>(null) }
+    var lojaDlg by remember { mutableStateOf<Int?>(null) }
+    var driveDlg by remember { mutableStateOf(false) }
+    var dragDlg by remember { mutableStateOf(false) }
+    var vel by remember { mutableFloatStateOf(0f) }
+    var laneY by remember { mutableFloatStateOf(133f) }
+    var odo by remember { mutableFloatStateOf(0f) }
+    val engine = remember { EngineSound() }
+    DisposableEffect(Unit) { onDispose { engine.release() } }
+    var shopDlg by remember { mutableStateOf<Int?>(null) }
+    var chatPed by remember { mutableStateOf<Int?>(null) }
+    var sayHungry by remember { mutableStateOf(false) }
+    var sayThirsty by remember { mutableStateOf(false) }
     var lateDay by remember { mutableIntStateOf(-1) }
     val meetField = remember(g.day) { genMeetField(g.day) }
     var say by remember { mutableStateOf<String?>("Bora achar uma pechincha!") }
@@ -555,9 +611,18 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     val near by remember { derivedStateOf { YARD_X.indexOfFirst { abs(px - it) < 30f } } }
     val nearMeet by remember { derivedStateOf { abs(px - MEET_X) < 70f } }
     val nearHome by remember { derivedStateOf { abs(px - HOME_X) < 55f } }
+    val nearGarage by remember { derivedStateOf { abs(px - GARAGE_X) < 60f } }
+    val nearStore by remember { derivedStateOf { STORE_X.indexOfFirst { abs(px - it) < 40f } } }
+    val nearLoja by remember { derivedStateOf { LOJA_X.indexOfFirst { abs(px - it) < 60f } } }
+    val nearZone by remember { derivedStateOf { if (abs(px - PARK_X) < 60f) 0 else if (abs(px - BEACH_X) < 60f) 1 else -1 } }
+    val nearDrag by remember { derivedStateOf { abs(px - DRAG_X) < 70f } }
+    val nearBiz by remember { derivedStateOf { COMPANY_X.indexOfFirst { abs(px - it) < 60f } } }
+    val nearPed by remember {
+        derivedStateOf { peds.indices.firstOrNull { abs(peds[it].base + sin(time * 0.4f + peds[it].phase) * 60f - px) < 20f } ?: -1 }
+    }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || jobDlg || propDlg != null || clubInside || propInside != null || bizDlg != null || shopDlg != null || chatPed != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -571,7 +636,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
         prefs.edit().putFloat("x", px).apply()
         if (paid < fare) g.message = "Sem dinheiro pro táxi? O motorista te deixou em casa mesmo assim."
         g.save()
-        if (g.minutes >= SLEEP_FROM) {
+        if (canSleep(g.minutes)) {
             sleepTaxi = true
             sleeping = true
         } else {
@@ -601,7 +666,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         lastNear = nn
                         if (nn >= 0) { say = "Olha o ${YARD_NAMES[nn]}!"; sayUntil = time + 3f }
                     }
-                    val pl = if (abs(px - MEET_X) < 60f) 1 else if (abs(px - HOME_X) < 55f) 2 else 0
+                    val pl = if (abs(px - MEET_X) < 60f) 1 else if (abs(px - HOME_X) < 55f) 2 else if (abs(px - GARAGE_X) < 70f) 3 else if (STORE_X.any { abs(px - it) < 50f }) 4 else 0
                     if (pl != lastPl) {
                         lastPl = pl
                         if (pl == 1) {
@@ -609,15 +674,98 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             sayUntil = time + 4f
                         }
                         if (pl == 2) { say = "Minha casinha."; sayUntil = time + 2.5f }
+                        if (pl == 3) { say = if (g.ownShop) "Minha empresa! Orgulho." else "Bora ver o que dá pra consertar!"; sayUntil = time + 3f }
+                        if (pl == 4) { say = "Que cheirinho bom..."; sayUntil = time + 2.5f }
                     }
+                    if (g.hunger < 30.0 && !sayHungry) { sayHungry = true; say = "Tô com fome... preciso comer algo."; sayUntil = time + 4f }
+                    if (g.hunger > 50.0) sayHungry = false
+                    if (g.thirst < 30.0 && !sayThirsty) { sayThirsty = true; say = "Que sede! Cadê uma água?"; sayUntil = time + 4f }
+                    if (g.thirst > 50.0) sayThirsty = false
                     val nf = nightF(g.minutes)
                     if (nf > 0.6f && !saidNight) { saidNight = true; say = "Já escureceu! Encontro de carros ou casa?"; sayUntil = time + 4f }
                     if (nf < 0.2f) saidNight = false
                     // madrugada: o personagem apaga de sono e oferece o táxi pra casa
-                    if (g.minutes >= 23 * 60 + 20 && lateDay != g.day && !isBusy()) { lateDay = g.day; lateAsk = true }
-                    if (dir != 0 && !isBusy()) {
-                        px = (px + dir * (if (run) 135f else 75f) * dt).coerceIn(20f, WORLD - 20f)
-                        face = dir
+                    // sono é só uma necessidade: avisa, mas NUNCA trava o relógio nem tira o controle do jogador
+                    if (g.energy < 25.0 && lateDay != g.day && !isBusy()) {
+                        lateDay = g.day; say = "Tô morrendo de sono... dá pra continuar, mas rendo menos. Casa e cama ajudam."; sayUntil = time + 4.5f
+                    }
+                    val dc = g.garage.firstOrNull { it.id == driveId }
+                    val wv = g.shift?.veh                       // veículo da empresa (táxi, moto, caminhão) durante o turno
+                    val driving = dc != null || wv != null
+                    if (driving) {
+                        val maxV = wv?.maxV ?: carStreetSpeed(dc!!)
+                        val busy = isBusy()
+                        val go = dir != 0 && !busy
+                        val tgt = if (go) dir * maxV else 0f
+                        vel += (tgt - vel) * minOf(1f, 2.2f * dt)
+                        if (busy) vel = 0f
+                        if (abs(vel) > 2f) {
+                            px = (px + vel * dt).coerceIn(20f, WORLD - 20f)
+                            face = if (vel > 0f) 1 else -1
+                            odo += abs(vel) * dt
+                        }
+                        if (Music.enabled && !busy) {
+                            engine.start()
+                            engine.set(38f + (abs(vel) / maxV).coerceIn(0f, 1f) * 130f, if (go) 0.8f else 0.35f)
+                        } else {
+                            engine.stop()
+                        }
+                    } else {
+                        if (vel != 0f) vel = 0f
+                        engine.stop()
+                        if (dir != 0 && !isBusy()) {
+                            px = (px + dir * (if (run) 135f else 75f) * (if (g.starving) 0.55f else 1f) * (if (g.tired) 0.8f else 1f) * dt).coerceIn(20f, WORLD - 20f)
+                            face = dir
+                        }
+                    }
+                    // ---- trabalho: o turno anda no mundo (pausa enquanto alguma janela está aberta)
+                    g.shift?.let { sh -> if (!isBusy()) workFrame(g, sh, px, vel, dt) }
+                    // ---- faixa do jogador: ultrapassa o trânsito mais lento pela faixa do meio (sem atravessar ninguém)
+                    if (driving) {
+                        val lane = if (face < 0) 1 else 0
+                        var targetG = if (lane == 0) 133f else 148f
+                        if (abs(vel) > 40f) {
+                            val pp = if (lane == 0) px else WORLD - px
+                            for (c in traffic) {
+                                if (c.lane != lane) continue
+                                val pc = if (lane == 0) c.x else WORLD - c.x
+                                var d = pc - pp
+                                if (d < -WORLD / 2f) d += WORLD
+                                if (d > WORLD / 2f) d -= WORLD
+                                if (d > -vehLen(c.spr) - 24f && d < 70f && c.v < abs(vel) - 5f) { targetG = 140.5f; break }
+                            }
+                        }
+                        laneY += (targetG - laneY) * minOf(1f, 5f * dt)
+                    } else {
+                        laneY = 133f
+                    }
+                    // ---- trânsito: cada carro mantém distância do da frente (e do jogador, se ele parar na faixa)
+                    for (c in traffic) {
+                        val pc = if (c.lane == 0) c.x else WORLD - c.x
+                        var gap = 1e9f
+                        var lv = c.v0
+                        for (o in traffic) {
+                            if (o === c || o.lane != c.lane) continue
+                            val po = if (o.lane == 0) o.x else WORLD - o.x
+                            var d = po - pc
+                            if (d < 0f) d += WORLD
+                            val gg = d - (c.len + o.len) / 2f - 4f
+                            if (gg < gap) { gap = gg; lv = o.v }
+                        }
+                        if (driving && (if (face < 0) 1 else 0) == c.lane && abs(laneY - (if (c.lane == 0) 133f else 148f)) < 4f) {
+                            val pp = if (c.lane == 0) px else WORLD - px
+                            var d = pp - pc
+                            if (d < 0f) d += WORLD
+                            val gg = d - (c.len + vehLen(wv?.spr ?: carSpriteFor(CATALOG[dc!!.model].body))) / 2f - 4f
+                            if (gg < gap) { gap = gg; lv = maxOf(0f, vel * (if (c.lane == 0) 1f else -1f)) }
+                        }
+                        val tgt = if (gap > 34f) c.v0 else if (gap <= 0f) 0f else minOf(c.v0, lv + gap * 1.2f)
+                        c.v += (tgt - c.v) * minOf(1f, 3f * dt)
+                        val step = if (gap <= 0f) 0f else minOf(c.v * dt, gap)
+                        c.x += step * (if (c.lane == 0) 1f else -1f)
+                        if (c.x >= WORLD) c.x -= WORLD
+                        if (c.x < 0f) c.x += WORLD
+                        c.dist += step
                     }
                 }
                 last = n
@@ -626,6 +774,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
 
     Column(Modifier.fillMaxSize()) {
+        NeedsBar(g)
+        WorkHud(g, px)
         Canvas(Modifier.fillMaxWidth().weight(1f)) {
             val s = size.width / VIEW_W
             val oy = size.height - 150f * s
@@ -635,6 +785,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
             val moving = dir != 0 && !isBusy()
             val skyH = oy + 104f * s
             val meetOn = g.minutes >= 17 * 60
+            val storesOpen = STORES.map { g.minutes in it.open until it.close }
 
             // prédios do fundo: larguras/alturas irregulares, antena, caixa d'água e janelas (algumas acesas)
             fun skyline() {
@@ -704,23 +855,33 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
 
             // ================= MUNDO (durante o dia: cenário parado) =================
             withTransform({ translate(0f, oy) }) {
-                // calçada com juntas irregulares
-                wr(Color(0xFFB7C4CB), cam, 104f, VIEW_W, 14f, cam, s)
-                var si = (cam / 14f).toInt() - 1
-                while (si * 14f < cam + VIEW_W + 14f) {
-                    wr(Color(0xFFA2B1B9), si * 14f + (hsh(si) % 3), 104f, 0.6f, 14f, cam, s)
-                    si++
+                // calçada: placas de concreto e trechos de pedra portuguesa (tiles de 32)
+                var wi = (cam / 32f).toInt() - 1
+                while (wi * 32f < cam + VIEW_W + 32f) {
+                    sp(spr.walk[if (hsh(wi / 3 + 11) % 3 == 0) 1 else 0], wi * 32f, 118f, cam, s)
+                    wi++
                 }
-                wr(Color(0xFF8A9AA3), cam, 117f, VIEW_W, 1.6f, cam, s)
-                wr(Color(0xFF4A5E6A), cam, 118.6f, VIEW_W, 31.4f, cam, s)
-                wr(Color(0xFF3E505B), cam, 140f, VIEW_W, 10f, cam, s)
+                wr(Color(0xFF8A9AA3), cam, 117f, VIEW_W, 2f, cam, s)
+                // meio-fio pintado (branco) em trechos
+                var cb = (cam / 40f).toInt() - 1
+                while (cb * 40f < cam + VIEW_W + 40f) {
+                    wr(Color(0xFFE8ECEE), cb * 40f + (hsh(cb) % 7), 117f, 14f, 1.6f, cam, s)
+                    cb++
+                }
+                // asfalto (textura) + faixa branca de borda
+                var rk = (cam / 48f).toInt() - 1
+                while (rk * 48f < cam + VIEW_W + 48f) {
+                    sp(spr.road, rk * 48f, 150f, cam, s)
+                    rk++
+                }
+                wr(Color(0xFFECEFF1).copy(alpha = 0.55f), cam, 121f, VIEW_W, 0.8f, cam, s)
                 // marcas de uso: faixa gasta, bueiro, remendo, poça, rachadura, papel no chão
                 val k0 = (cam / 26f).toInt() - 1
                 val k1 = ((cam + VIEW_W) / 26f).toInt() + 2
                 for (k in k0..k1) {
                     val h = hsh(k * 977 + 13)
                     val cx = k * 26f + (h % 9)
-                    wr(Color(0xFFECEFF1).copy(alpha = 0.55f + (h / 11 % 4) * 0.1f), cx + 2f, 133.5f, 10f + (h / 3 % 5), 1.2f, cam, s)
+                    wr(Color(0xFFF2C230).copy(alpha = 0.75f + (h / 11 % 4) * 0.06f), cx + 2f, 140f, 11f + (h / 3 % 3), 1.2f, cam, s)
                     when ((h / 7) % 9) {
                         0 -> {
                             wr(Color(0xFF2B363D), cx + 6f, 126f, 8f, 3f, cam, s)
@@ -740,6 +901,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     }
                 }
 
+                drawZones(cam, s, t, night, ((oy - 12f * s) / skyH), paint)
                 // cidade
                 for (ci in city) {
                     if (ci.x > cam + VIEW_W + 20f || ci.x < cam - 110f) continue
@@ -750,27 +912,13 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             wr(Color(0x33000000), ci.x, 101f, bw, 3f, cam, s)
                             sp(spr.bld[ci.idx], ci.x, 104f, cam, s)
                             wr(Color(0x14000000), ci.x, 98f, bw, 6f, cam, s)
-                            val hv = hsh(ci.idx * 31 + ci.x.toInt())
-                            val topY = 104f - bh
-                            when (hv % 4) {
-                                0 -> {
-                                    val tx = ci.x + 3f + (hv / 4 % (bw - 14f).toInt().coerceAtLeast(1))
-                                    wr(Color(0xFF6D6D72), tx, topY - 6f, 9f, 6f, cam, s)
-                                    wr(Color(0xFF55555A), tx - 0.4f, topY - 7f, 9.8f, 1.2f, cam, s)
-                                }
-                                1 -> {
-                                    val ax = ci.x + bw * 0.3f
-                                    wr(Color(0xFF2B2B2F), ax, topY - 9f, 0.7f, 9f, cam, s)
-                                    wr(Color(0xFF2B2B2F), ax - 3f, topY - 8f, 6.6f, 0.6f, cam, s)
-                                    wr(Color(0xFF2B2B2F), ax - 2f, topY - 5.5f, 4.6f, 0.6f, cam, s)
-                                }
-                                else -> {}
-                            }
                         }
                         1 -> sp(spr.tree[ci.idx], ci.x, 112f, cam, s)
-                        2 -> sp(spr.lamp, ci.x, 116f, cam, s)
-                        3 -> sp(spr.sign[ci.idx], ci.x, 112f, cam, s, 0.6f)
+                        2 -> sp(spr.lamp[ci.idx.coerceIn(0, 1)], ci.x, 116f, cam, s)
+                        3 -> sp(spr.sign[ci.idx], ci.x, 112f, cam, s)
                         4 -> {
+                            // faixa de pedestres (zebra) ao lado do semáforo
+                            for (zi in 0..5) wr(Color(0xFFF4F4F4).copy(alpha = 0.8f), ci.x + 14f + zi * 6f, 122f, 3f, 26f, cam, s)
                             sp(spr.tl, ci.x, 116f, cam, s)
                             val ph = (t * 0.12f + ci.x * 0.003f) % 1f
                             val li = if (ph < 0.45f) 2 else if (ph < 0.55f) 1 else 0
@@ -806,13 +954,17 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             wr(Color(0xFF212121), ci.x + 5.4f, by - 5.1f, 0.5f, 0.6f, cam, s)
                             wr(fur, ci.x - 2f, by - 2.2f + sw, 2.2f, 0.9f, cam, s)
                         }
-                        else -> {   // vaso de planta
+                        9 -> {   // vaso de planta
                             val by = 113.5f
                             wr(Color(0xFFB0643A), ci.x, by - 3.6f, 4.4f, 3.6f, cam, s)
                             wr(Color(0xFF8E4D2B), ci.x - 0.3f, by - 4.2f, 5f, 0.9f, cam, s)
                             wr(Color(0xFF2E8B3A), ci.x - 0.6f, by - 7.6f, 5.6f, 3.6f, cam, s)
                             wr(Color(0xFF3FA84C), ci.x + 1f, by - 9f, 2.6f, 2f, cam, s)
                         }
+                        10 -> sp(spr.busStop, ci.x, 112f, cam, s)   // ponto de ônibus
+                        11 -> sp(spr.phone, ci.x, 112f, cam, s)     // orelhão
+                        12 -> sp(spr.cart, ci.x, 112f, cam, s)      // carrinho de milho
+                        else -> {}
                     }
                 }
 
@@ -827,6 +979,11 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         quadraticBezierTo((x0 + x1) / 2f, 93f * s, x1, 86.5f * s)
                     }
                     drawPath(wire, Color(0xFF2B2B33).copy(alpha = 0.8f), style = Stroke(width = 0.4f * s))
+                    val wire2 = Path().apply {
+                        moveTo(x0, 88f * s)
+                        quadraticBezierTo((x0 + x1) / 2f, 96f * s, x1, 88f * s)
+                    }
+                    drawPath(wire2, Color(0xFF2B2B33).copy(alpha = 0.6f), style = Stroke(width = 0.35f * s))
                     if (night < 0.5f && hsh(i * 5 + 1) % 3 == 0) {
                         val tt = 0.3f + (hsh(i) % 40) / 100f
                         val bx = (1f - tt) * (1f - tt) * x0 + 2f * (1f - tt) * tt * ((x0 + x1) / 2f) + tt * tt * x1
@@ -842,11 +999,13 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     if (yx + 100f < cam || yx - 100f > cam + VIEW_W) return@forEachIndexed
                     wr(Color(0xFF5D4037), yx - 85f, 72f, 170f, 32f, cam, s)
                     wr(Color(0xFF4E342E), yx - 85f, 96f, 170f, 8f, cam, s)
-                    val tint = Color(0x66554433)
-                    sp(spr.cars[(i * 2) % 9], yx - 82f, 104f, cam, s, 1f, false, tint)
-                    sp(spr.cars[(i * 3 + 1) % 9], yx - 76f, 84f, cam, s, 1f, true, tint)
-                    sp(spr.cars[(i * 5 + 2) % 9], yx + 24f, 104f, cam, s, 1f, i % 2 == 0, tint)
-                    sp(spr.cars[(i * 7 + 4) % 9], yx + 30f, 84f, cam, s, 0.9f, false, tint)
+                    // carcaças: lataria destruída "assada" no sprite (ferrugem, primer, amassados)
+                    fun junk(n: Int, cxw: Float, gr: Float, fl: Boolean) =
+                        drawVehWorld(spr.veh, n % V_GARAGE, Color(PAINTS[(n * 3 + i) % PAINTS.size].second), emptyList(), JUNK_COND, cxw, gr, cam, s, fl, t, null, 0f, 0f)
+                    junk(i * 2, yx - 51f, 104f, false)
+                    junk(i * 3 + 1, yx - 45f, 84f, true)
+                    junk(i * 5 + 2, yx + 55f, 104f, i % 2 == 0)
+                    junk(i * 7 + 4, yx + 61f, 84f, false)
                     for (k in 0..2) {
                         drawCircle(Color(0xFF1B1B1B), 4f * s, Offset((yx - 30f + k * 0f - cam) * s, (101f - k * 7f) * s))
                         drawCircle(Color(0xFF6B6B6B), 1.6f * s, Offset((yx - 30f - cam) * s, (101f - k * 7f) * s))
@@ -866,6 +1025,14 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 }
                 drawHome(cam, s, t, night, paint)
                 drawMeetLot(cam, s, t, night, g.minutes >= MEET_START, paint)
+                garageSignText = g.motorsName().uppercase()
+                drawGarageShop(g.ownShop, garageOpen(g), cam, s, t, paint)
+                drawStores(storesOpen, cam, s, t, paint)
+                drawProps(ownedProps, cam, s, t, paint)
+                drawClub(clubOpen(g.minutes), cam, s, t, paint)
+                drawCompanies(g, cam, s, t, paint)
+                drawLojas(g, cam, s, t, paint)
+                drawDragStrip(cam, s, t, paint)
             }
 
             // ---- escuridão da noite (só no mundo, o céu já tem a própria cor) e pôr do sol
@@ -903,6 +1070,11 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     }
                     drawHomeLit(cam, s, night)
                     drawMeetLit(cam, s, t, night, g.minutes >= MEET_START, paint)
+                    drawGarageLit(g.ownShop, garageOpen(g), cam, s, night, paint)
+                    drawStoresLit(storesOpen, cam, s, night, paint)
+                    drawCompaniesLit(g, cam, s, night, paint)
+                    drawLojasLit(g, cam, s, night, paint)
+                    drawZonesLit(cam, s, night)
                 }
             }
 
@@ -917,24 +1089,55 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 if (meetOn && MEET_X + 110f > cam && MEET_X - 110f < cam + VIEW_W) {
                     meetField.take(3).forEachIndexed { i, mc ->
                         val si = carSpriteFor(CATALOG[mc.model].body)
-                        val tintC = Color(PAINTS[mc.color].second).copy(alpha = 0.35f)
-                        sp(spr.cars[si], MEET_X - 100f + i * 66f, 112f, cam, s, 0.95f, i == 1, tintC, 1f, si, 0f, null)
+                        drawVehWorld(spr.veh, si, Color(PAINTS[mc.color.coerceIn(0, PAINTS.lastIndex)].second), mc.tuning, mc.cond,
+                            MEET_X - 69f + i * 66f, 112f, cam, s, i == 1, t, null, 0f, 0f)
                     }
                     meetField.forEachIndexed { i, mc ->
                         val ox = MEET_X - 88f + i * 42f
                         drawChar(mc.look, (ox - 6f - cam) * s, (114f - 26f) * s, s, i % 2 == 1, 0f, t * 2f + i)
                     }
                 }
-                drawChar(look, (px - 6f - cam) * s, (115f - 26f) * s, s, face < 0, if (moving) 1f else 0f,
-                    t * (if (run) 16f else 10f))
-                for (c in traffic) {
-                    val x = (((c.x0 + t * c.speed) % WORLD) + WORLD) % WORLD
-                    if (x < cam - 90f || x > cam + VIEW_W + 10f) continue
-                    val img = spr.cars[c.spr]
-                    val rot = (t * abs(c.speed) + c.x0) / 4.5f
-                    if (c.lane == 0) sp(img, x, 133f, cam, s, 1.1f, false, null, 1f, c.spr, rot, c.driver)
-                    else sp(img, x, 148f, cam, s, 1.1f, true, null, 1f, c.spr, rot, c.driver)
+                drawWork(g, spr, cam, s, t, paint)
+                val wveh = g.shift?.veh
+                val dcar = if (wveh != null) null else g.garage.firstOrNull { it.id == driveId }
+                if (dcar == null && wveh == null) {
+                    drawChar(look, (px - 6f - cam) * s, (115f - 26f) * s, s, face < 0, if (moving) 1f else 0f,
+                        t * (if (run) 16f else 10f))
                 }
+                // ORDEM DE PROFUNDIDADE: quem tem o chão mais embaixo (y maior) fica na frente.
+                // faixa de cima (y=133) -> jogador (se estiver no meio, y~140) -> faixa de baixo (y=148)
+                var playerDrawn = dcar == null && wveh == null
+                fun drawPlayerCar() {
+                    if (playerDrawn) return
+                    playerDrawn = true
+                    if (wveh != null) {
+                        drawVehWorld(
+                            spr.veh, wveh.spr, Color(PAINTS[wveh.color.coerceIn(0, PAINTS.lastIndex)].second),
+                            emptyList(), WORK_FULL, px, laneY, cam, s, face < 0, t, look, odo, abs(vel),
+                        )
+                        return
+                    }
+                    val dc = dcar ?: return
+                    drawVehWorld(
+                        spr.veh, carSpriteFor(CATALOG[dc.model].body), Color(PAINTS[dc.color.coerceIn(0, PAINTS.lastIndex)].second),
+                        dc.tuning, dc.cond, px, laneY, cam, s, face < 0, t, look, odo, abs(vel),
+                    )
+                }
+                fun drawLane(lane: Int) {
+                    for (c in traffic) {
+                        if (c.lane != lane) continue
+                        if (c.x < cam - 100f || c.x > cam + VIEW_W + 100f) continue
+                        drawVehWorld(
+                            spr.veh, c.spr, Color(PAINTS[c.color.coerceIn(0, PAINTS.lastIndex)].second), emptyList(), c.cond,
+                            c.x, if (lane == 0) 133f else 148f, cam, s, lane == 1, t, c.driver, c.dist, c.v,
+                        )
+                    }
+                }
+                if (laneY < 133f) drawPlayerCar()
+                drawLane(0)
+                if (laneY < 148f) drawPlayerCar()
+                drawLane(1)
+                drawPlayerCar()
             }
             // à noite, rua e gente escurecem um pouco (pra não parecer recortado em cima da escuridão)
             if (night > 0f) {
@@ -968,27 +1171,36 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             glow(lc, 7f * s, Color(0xFFFFF1C2).copy(alpha = 0.95f * night))
                         }
                     }
-                    for (c in traffic) {
-                        val x = (((c.x0 + t * c.speed) % WORLD) + WORLD) % WORLD
-                        if (x < cam - 90f || x > cam + VIEW_W + 60f) continue
-                        val wcar = spr.cars[c.spr].width * 1.1f
-                        val by = if (c.lane == 0) 133f else 148f
-                        val sgn = if (c.lane == 0) 1f else -1f
-                        val fx = if (c.lane == 0) x + wcar - 1f else x + 1f
-                        val fp = Offset((fx - cam) * s, (by - 6.5f) * s)
+                    fun carLamps(cxw: Float, by: Float, sgn: Float, si: Int, tint: Color = Color(0xFFFFF3B0)) {
+                        val m = VMETA[si.coerceIn(0, V_COUNT - 1)]
+                        val fp = Offset((cxw + sgn * (m.hl[0] - m.cx) - cam) * s, (by - (m.gy - m.hl[1])) * s)
                         val beam = Path().apply {
                             moveTo(fp.x, fp.y - 1.2f * s); lineTo(fp.x + sgn * 48f * s, fp.y - 8f * s)
                             lineTo(fp.x + sgn * 48f * s, fp.y + 6f * s); lineTo(fp.x, fp.y + 1.2f * s); close()
                         }
                         drawPath(
                             beam,
-                            Brush.horizontalGradient(listOf(Color(0xFFFFF3B0).copy(alpha = 0.55f * night), Color(0xFFFFF3B0).copy(alpha = 0f)), fp.x, fp.x + sgn * 48f * s),
+                            Brush.horizontalGradient(listOf(tint.copy(alpha = 0.55f * night), tint.copy(alpha = 0f)), fp.x, fp.x + sgn * 48f * s),
                             blendMode = BlendMode.Plus,
                         )
                         glow(fp, 5f * s, Color(0xFFFFFFFF).copy(alpha = 0.95f * night))
-                        val rx = if (c.lane == 0) x + 1f else x + wcar - 3f
-                        wr(Color(0xFFFF1744).copy(alpha = night), rx, by - 9f, 2f, 2f, cam, s)
-                        glow(Offset((rx + 1f - cam) * s, (by - 8f) * s), 5f * s, Color(0xFFFF1744).copy(alpha = 0.4f * night))
+                        val tx = cxw + sgn * (m.tl[0] - m.cx)
+                        val ty = by - (m.gy - m.tl[1])
+                        wr(Color(0xFFFF1744).copy(alpha = night), tx - 1f, ty - 1f, 2f, 2f, cam, s)
+                        glow(Offset((tx - cam) * s, ty * s), 5f * s, Color(0xFFFF1744).copy(alpha = 0.4f * night))
+                    }
+                    for (c in traffic) {
+                        if (c.x < cam - 100f || c.x > cam + VIEW_W + 100f) continue
+                        carLamps(c.x, if (c.lane == 0) 133f else 148f, if (c.lane == 0) 1f else -1f, c.spr)
+                    }
+                    val nightWv = g.shift?.veh
+                    val nightCar = if (nightWv != null) null else g.garage.firstOrNull { it.id == driveId }
+                    if (nightWv != null) carLamps(px, laneY, if (face < 0) -1f else 1f, nightWv.spr)
+                    if (nightCar != null) {
+                        carLamps(
+                            px, laneY, if (face < 0) -1f else 1f, carSpriteFor(CATALOG[nightCar.model].body),
+                            if ("farol" in nightCar.tuning) Color(0xFF8FD3FF) else Color(0xFFFFF3B0),
+                        )
                     }
                 }
             }
@@ -1025,16 +1237,47 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         talk = near to first
                     }) { Text("Entrar", fontSize = 13.sp) }
                 } else if (nearMeet) {
-                    Button(onClick = { meetDlg = true }) { Text("🏁 Encontro de carros", fontSize = 13.sp) }
+                    Button(onClick = { meetDlg = true }) { Text("Encontro de carros", fontSize = 13.sp) }
                 } else if (nearHome) {
-                    Button(onClick = { homeDlg = true }) { Text("🏠 Entrar em casa", fontSize = 13.sp) }
+                    Button(onClick = { homeDlg = true }) { Text("Entrar em casa", fontSize = 13.sp) }
+                } else if (nearGarage) {
+                    Button(onClick = { garageDlg = true }) { Text(if (g.ownShop) "${g.motorsName()}" else "Entrar na oficina", fontSize = 13.sp) }
+                } else if (nearZone >= 0) {
+                    Button(onClick = { zoneDlg = nearZone }) { Text(if (nearZone == 0) "Parque Central" else "Quiosque da Praia", fontSize = 13.sp) }
+                } else if (nearDrag) {
+                    Button(onClick = { dragDlg = true }) { Text("Pista de Arrancada", fontSize = 13.sp) }
+                } else if (nearLoja >= 0) {
+                    Button(onClick = { lojaDlg = nearLoja }) { Text(lojaLabel(g, nearLoja), fontSize = 13.sp) }
+                } else if (nearBiz >= 0) {
+                    Button(onClick = { bizDlg = nearBiz }) {
+                        Text(if (nearBiz in g.companies) "${COMPANY_ICONS[nearBiz]} ${g.empName(nearBiz)}" else "Terreno à venda", fontSize = 13.sp)
+                    }
+                } else if (nearStore >= 0) {
+                    Button(onClick = { shopDlg = nearStore }) { Text("Entrar: " + STORES[nearStore].title, fontSize = 13.sp) }
+                } else if (nearClub) {
+                    Button(onClick = {
+                        if (!clubOpen(g.minutes)) g.message = "O baile abre às 20h."
+                        else if (g.money < CLUB_FEE) g.message = "Ingresso: ${brl(CLUB_FEE)}. Falta dinheiro."
+                        else { g.money -= CLUB_FEE; clubInside = true }
+                    }) { Text(if (clubOpen(g.minutes)) "Entrar no baile · ${brl(CLUB_FEE)}" else "Baile (abre às 20h)", fontSize = 13.sp) }
+                } else if (nearProp >= 0) {
+                    Button(onClick = { propDlg = nearProp }) { Text(if (nearProp in ownedProps) "${PROPS[nearProp].name}" else "Imóvel à venda", fontSize = 13.sp) }
+                } else if (nearPed >= 0) {
+                    Button(onClick = { chatPed = nearPed }) { Text("Conversar com ${pedName(nearPed)}", fontSize = 13.sp) }
                 } else {
-                    Text("Explore a cidade", fontSize = 12.sp)
+                    Text(if (driveId != null || g.shift?.veh != null) "${(abs(vel) * 0.5f).toInt()} km/h" else "Explore a cidade", fontSize = 12.sp)
                 }
                 Row {
-                    TextButton(onClick = { taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("🚕 Táxi", fontSize = 12.sp) }
-                    TextButton(onClick = { run = !run }, contentPadding = PaddingValues(6.dp)) { Text(if (run) "🏃 Correndo" else "🚶 Andando", fontSize = 12.sp) }
-                    TextButton(onClick = onEdit, contentPadding = PaddingValues(6.dp)) { Text("🧍 Visual", fontSize = 12.sp) }
+                    TextButton(onClick = { if (driveId != null) driveId = null else driveDlg = true }, enabled = g.shift?.veh == null, contentPadding = PaddingValues(6.dp)) { Text(if (g.shift?.veh != null) "Em serviço" else if (driveId != null) "Descer" else "Dirigir", fontSize = 12.sp) }
+                }
+                Row {
+                    TextButton(onClick = { garageListDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("Garagem", fontSize = 12.sp) }
+                    TextButton(onClick = { summaryDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("Resumo", fontSize = 12.sp) }
+                    TextButton(onClick = { jobDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("Trabalhar", fontSize = 12.sp) }
+                }
+                Row {
+                    TextButton(onClick = { if (g.shift != null) g.message = "Você está em serviço: encerre o turno antes de pegar táxi." else taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("Táxi", fontSize = 12.sp) }
+                    TextButton(onClick = { run = !run }, contentPadding = PaddingValues(6.dp)) { Text(if (run) "Correndo" else "Andando", fontSize = 12.sp) }
                 }
             }
             RoundHold(1, { dir = if (it) 1 else 0 })
@@ -1045,13 +1288,27 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
         YardTalk(g, yi, me.name, me.look.female, first, mask == 31, spr) { talk = null }
     }
     if (meetDlg) CarMeetDialog(g, me.name, me.look) { meetDlg = false }
+    if (garageDlg) { if (g.ownShop) InteriorDialog(g, Room.WORKSHOP) { garageDlg = false } else WorkshopDialog(g) { garageDlg = false } }
+    if (garageListDlg) GarageDialog(g) { garageListDlg = false }
+    if (summaryDlg) SummaryDialog(g) { summaryDlg = false }
+    if (jobDlg) JobsDialog(g) { jobDlg = false }
+    if (driveDlg) CarPickDialog(g, onPick = { driveId = it; driveDlg = false }, onClose = { driveDlg = false })
+    if (dragDlg) DragDialog(g, spr) { dragDlg = false }
+    zoneDlg?.let { zi -> InteriorDialog(g, if (zi == 0) Room.PARK else Room.BEACH) { zoneDlg = null } }
+    lojaDlg?.let { li -> LojaDialog(g, li) { lojaDlg = null } }
+    bizDlg?.let { bi -> if (bi == 0 && 0 in g.companies) InteriorDialog(g, Room.SHOP) { bizDlg = null } else CompanyDialog(g, bi) { bizDlg = null } }
+    shopDlg?.let { si -> InteriorDialog(g, Room.STORE, storeIdx = si) { shopDlg = null } }
+    if (clubInside) InteriorDialog(g, Room.CLUB) { clubInside = false }
+    propDlg?.let { pi -> PropDialog(g, pi, ownedProps, onOwned = { ownedProps = it }, onEnter = { propDlg = null; propInside = pi }) { propDlg = null } }
+    propInside?.let { pi -> InteriorDialog(g, Room.HOME, onSleep = { propInside = null; wakeX = PROPS[pi].x; sleepTaxi = false; sleeping = true }, title = PROPS[pi].name) { propInside = null } }
+    chatPed?.let { pi -> StreetChat(g, peds[pi].look, pedName(pi), me.name) { chatPed = null } }
     if (homeDlg) {
-        HomeDialog(g, onSleep = { homeDlg = false; sleepTaxi = false; sleeping = true }, onClose = { homeDlg = false })
+        InteriorDialog(g, Room.HOME, onSleep = { homeDlg = false; wakeX = HOME_X + 30f; sleepTaxi = false; sleeping = true }) { homeDlg = false }
     }
     if (sleeping) {
         SleepScene(g, me.name, me.look.female, sleepTaxi) {
             sleeping = false
-            px = HOME_X + 30f
+            px = wakeX
             face = 1
             prefs.edit().putFloat("x", px).apply()
             say = "Bom dia! Hoje eu fecho negócio."
@@ -1062,9 +1319,9 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
         Dialog(onDismissRequest = { lateAsk = false }) {
             Card {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("🌙 Já é madrugada!", fontWeight = FontWeight.Bold)
+                    Text("Já é madrugada!", fontWeight = FontWeight.Bold)
                     Text("${me.name} tá morrendo de sono. Melhor chamar um táxi e ir dormir em casa.", fontSize = 13.sp)
-                    Button(onClick = { lateAsk = false; rideHome() }, Modifier.fillMaxWidth()) { Text("🚕 Ir pra casa e dormir") }
+                    Button(onClick = { lateAsk = false; rideHome() }, Modifier.fillMaxWidth()) { Text("Ir pra casa e dormir") }
                     TextButton(onClick = { lateAsk = false }) { Text("Mais um pouquinho") }
                 }
             }
@@ -1073,8 +1330,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     if (taxi) {
         Dialog(onDismissRequest = { taxi = false }) {
             Card {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("🚕 Táxi - pra onde?", fontWeight = FontWeight.Bold)
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Táxi - pra onde?", fontWeight = FontWeight.Bold)
                     YARD_X.forEachIndexed { i, yx ->
                         val dist = abs(px - yx)
                         val fare = (dist / 25f).toInt().coerceAtLeast(10)
@@ -1111,12 +1368,123 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             taxi = false
                         },
                         Modifier.fillMaxWidth(),
-                    ) { Text("🏁 Encontro de Carros - ${brl(fareM)}", fontSize = 13.sp) }
+                    ) { Text("Encontro de Carros - ${brl(fareM)}", fontSize = 13.sp) }
+                    val distG = abs(px - GARAGE_X)
+                    val fareG = taxiFare(distG)
+                    OutlinedButton(
+                        onClick = {
+                            if (g.money < fareG) {
+                                g.message = "Sem dinheiro pro táxi."
+                            } else {
+                                g.money -= fareG
+                                g.spendTime(taxiMinutes(distG))
+                                px = GARAGE_X - 75f
+                                prefs.edit().putFloat("x", px).apply()
+                                g.save()
+                            }
+                            taxi = false
+                        },
+                        Modifier.fillMaxWidth(),
+                    ) { Text("Oficina - ${brl(fareG)}", fontSize = 13.sp) }
+                    COMPANY_X.forEachIndexed { ci, cxx ->
+                        if (ci in g.companies) {
+                            val distC = abs(px - cxx)
+                            val fareC = taxiFare(distC)
+                            OutlinedButton(
+                                onClick = {
+                                    if (g.money < fareC) {
+                                        g.message = "Sem dinheiro pro táxi."
+                                    } else {
+                                        g.money -= fareC
+                                        g.spendTime(taxiMinutes(distC))
+                                        px = cxx - 75f
+                                        prefs.edit().putFloat("x", px).apply()
+                                        g.save()
+                                    }
+                                    taxi = false
+                                },
+                                Modifier.fillMaxWidth(),
+                            ) { Text("${COMPANY_ICONS[ci]} ${g.empName(ci)} - ${brl(fareC)}", fontSize = 13.sp) }
+                        }
+                    }
+                    LOJA_X.forEachIndexed { li, lxx ->
+                        val lt = g.lojas[li]
+                        if (lt != null) {
+                            val distL = abs(px - lxx)
+                            val fareL = taxiFare(distL)
+                            OutlinedButton(
+                                onClick = {
+                                    if (g.money < fareL) {
+                                        g.message = "Sem dinheiro pro táxi."
+                                    } else {
+                                        g.money -= fareL
+                                        g.spendTime(taxiMinutes(distL))
+                                        px = lxx - 75f
+                                        prefs.edit().putFloat("x", px).apply()
+                                        g.save()
+                                    }
+                                    taxi = false
+                                },
+                                Modifier.fillMaxWidth(),
+                            ) { Text("${LOJA_ICONS[lt]} ${g.lojaName(li)} - ${brl(fareL)}", fontSize = 13.sp) }
+                        }
+                    }
+                    val distD = abs(px - DRAG_X)
+                    val fareD = taxiFare(distD)
+                    OutlinedButton(
+                        onClick = {
+                            if (g.money < fareD) {
+                                g.message = "Sem dinheiro pro táxi."
+                            } else {
+                                g.money -= fareD
+                                g.spendTime(taxiMinutes(distD))
+                                px = DRAG_X - 75f
+                                prefs.edit().putFloat("x", px).apply()
+                                g.save()
+                            }
+                            taxi = false
+                        },
+                        Modifier.fillMaxWidth(),
+                    ) { Text("Pista de Arrancada - ${brl(fareD)}", fontSize = 13.sp) }
+                    val distP = abs(px - PARK_X)
+                    OutlinedButton(
+                        onClick = {
+                            val fareP = taxiFare(distP)
+                            if (g.money < fareP) {
+                                g.message = "Sem dinheiro pro táxi."
+                            } else {
+                                g.money -= fareP
+                                g.spendTime(taxiMinutes(distP))
+                                px = PARK_X - 75f
+                                prefs.edit().putFloat("x", px).apply()
+                                g.save()
+                            }
+                            taxi = false
+                        },
+                        Modifier.fillMaxWidth(),
+                    ) { Text("Parque Central - ${brl(taxiFare(distP))}", fontSize = 13.sp) }
+                    val distB = abs(px - BEACH_X)
+                    OutlinedButton(
+                        onClick = {
+                            val fareB = taxiFare(distB)
+                            if (g.money < fareB) {
+                                g.message = "Sem dinheiro pro táxi."
+                            } else {
+                                g.money -= fareB
+                                g.spendTime(taxiMinutes(distB))
+                                px = BEACH_X - 75f
+                                prefs.edit().putFloat("x", px).apply()
+                                g.save()
+                            }
+                            taxi = false
+                        },
+                        Modifier.fillMaxWidth(),
+                    ) { Text("Praia - ${brl(taxiFare(distB))}", fontSize = 13.sp) }
                     val fareH = taxiFare(abs(px - HOME_X))
                     OutlinedButton(
                         onClick = { taxi = false; rideHome() },
                         Modifier.fillMaxWidth(),
-                    ) { Text((if (g.minutes >= SLEEP_FROM) "🏠 Casa (ir dormir) - " else "🏠 Minha casa - ") + brl(fareH), fontSize = 13.sp) }
+                    ) { Text((if (canSleep(g.minutes)) "Casa (ir dormir) -" else "Minha casa -") + brl(fareH), fontSize = 13.sp) }
                     TextButton(onClick = { taxi = false }) { Text("Cancelar") }
                 }
             }
@@ -1178,8 +1546,12 @@ private fun CharacterCreator(onDone: (PlayerProfile) -> Unit) {
         FilterChip(walking, { walking = !walking }, { Text(if (walking) "Andando" else "Parado") })
         OutlinedTextField(name, { name = it.take(14) }, label = { Text("Nome") }, singleLine = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(!female, { female = false }, { Text("Homem") })
-            FilterChip(female, { female = true }, { Text("Mulher") })
+            FilterChip(!female, {
+                if (female) { female = false; hairStyle = 0; botType = 0; top = 0 }
+            }, { Text("Homem") })
+            FilterChip(female, {
+                if (!female) { female = true; hairStyle = 1; botType = 2; top = 9 }
+            }, { Text("Mulher") })
         }
         Chooser("Cabelo", HAIR_STYLES, hairStyle) { hairStyle = it }
         Swatches("Cor do cabelo", CHAIR, hair) { hair = it }
@@ -1325,7 +1697,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, female: Boolean, firs
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PixelPerson(o.look, Modifier.size(48.dp, 84.dp))
                     Column {
-                        Text(o.name + when (mood) { 0 -> "  😠"; 2 -> "  😄"; else -> "  😐" }, fontWeight = FontWeight.Bold)
+                        Text(o.name + when (mood) { 0 -> ""; 2 -> ""; else -> "" }, fontWeight = FontWeight.Bold)
                         Text(speech, fontSize = 14.sp)
                         you?.let { Text("$pname: $it", fontSize = 13.sp, color = Color(0xFF90CAF9)) }
                     }
@@ -1343,7 +1715,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, female: Boolean, firs
                                 Modifier.fillMaxWidth().clickable { picked = c; speech = "Esse aí? Boa escolha. Quanto você paga?" }.padding(4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Image(spr.cars[carSpriteFor(m.body)], null, Modifier.width(64.dp).height(24.dp), filterQuality = FilterQuality.None)
+                                CarArt(m.body, c.color, emptyList(), c.cond, Modifier.width(72.dp).height(32.dp))
                                 Column { Text("${m.fullName} ${c.year}", fontSize = 13.sp); Text(brl(c.price), fontSize = 12.sp) }
                             }
                         }
@@ -1351,7 +1723,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, female: Boolean, firs
                     TextButton(onClick = onClose) { Text("Sair") }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Image(spr.cars[carSpriteFor(CATALOG[y.model].body)], null, Modifier.width(64.dp).height(24.dp), filterQuality = FilterQuality.None)
+                        CarArt(CATALOG[y.model].body, y.color, emptyList(), y.cond, Modifier.width(72.dp).height(32.dp))
                         Column { Text("${CATALOG[y.model].fullName} ${y.year}", fontSize = 13.sp); Text("Preço agora: ${brl(cur)}", fontWeight = FontWeight.Bold) }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
