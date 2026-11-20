@@ -108,6 +108,7 @@ private fun commentFor(g: GameState, c: OwnedCar, rnd: Random): String {
 @Composable
 fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx: Int = 0, title: String? = null, onClose: () -> Unit) {
     val ctx = LocalContext.current
+    val vset = remember { CitySprites.get(ctx).veh }
     val prefs = remember { ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE) }
     val profile = remember { loadProfile(prefs) }
     val myLook = profile?.look ?: remember { randomLook(Random(1)) }
@@ -372,7 +373,7 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
                                 val b = body ?: CATALOG[c!!.model].body
                                 val paint = Color(PAINTS[(c?.color ?: 3).coerceIn(0, PAINTS.lastIndex)].second)
                                 withTransform({ translate((cx - 31f * 5.2f / 62f * 0f) * u - 31f * ku, by * u - 22.5f * ku); scale(ku, ku, Offset.Zero) }) {
-                                    drawCarUnits(shapeFor(b), b.ordinal * 17 + 3, paint, c?.tuning ?: emptyList(), c?.cond ?: List(5) { 45 }, time % 1.6f / 1.6f, null)
+                                    drawVeh(vset, vehicleFor(b), paint, c?.tuning ?: emptyList(), c?.cond ?: List(5) { 45 }, time % 1.6f / 1.6f, null, 0f, 0f)
                                 }
                                 val txt = label ?: run {
                                     val car = c!!

@@ -190,7 +190,7 @@ private fun RaceScene(
     spr: CitySprites, car: OwnedCar?, t: Float, dist: Float, oppT: Float, opp2T: Float,
     light: Int, racing: Boolean, boost: Float, gas: Boolean, speed: Float,
 ) {
-    val rivalIdx = remember(oppT) { intArrayOf(hsh((oppT * 1000f).toInt()) % 9, hsh((oppT * 777f).toInt() + 5) % 9) }
+    val rivalIdx = remember(oppT) { intArrayOf(hsh((oppT * 1000f).toInt()) % V_GARAGE, hsh((oppT * 777f).toInt() + 5) % V_GARAGE) }
     val rivalCol = remember(oppT) { intArrayOf(hsh((oppT * 313f).toInt()) % PAINTS.size, hsh((oppT * 911f).toInt() + 3) % PAINTS.size) }
     Canvas(Modifier.fillMaxWidth().height(170.dp)) {
         val s = size.width / VIEW_W
@@ -255,9 +255,7 @@ private fun RaceScene(
         }
         // carros: o mais ao fundo primeiro
         fun drawCar(idx: Int, colIdx: Int, x: Float, by: Float, showFx: Boolean) {
-            val img = spr.cars[idx]
-            val w = img.width * 0.9f
-            val left = x - w + 6f
+            val left = x - 52f
             if (showFx) {
                 if (gas && speed < 25f) {
                     for (q in 0..2) drawCircle(Color(0x88FFFFFF), (2f + q) * s, Offset((left + 2f - q * 5f - cam) * s, (by - 3f - q) * s))
@@ -267,7 +265,12 @@ private fun RaceScene(
                     wr(Color(0xFFFFEB3B), left - 5f, by - 7.4f, 5f, 1.8f, cam, s)
                 }
             }
-            sp(img, left, by, cam, s, 0.9f, false, Color(PAINTS[colIdx].second).copy(alpha = 0.35f), 1f, idx, x / 4.5f, null)
+            // x = frente do carro; o centro do sprite fica ~23 unidades atrás. As rodas giram com a distância andada.
+            drawVehWorld(
+                spr.veh, idx, Color(PAINTS[colIdx.coerceIn(0, PAINTS.lastIndex)].second),
+                if (showFx) (car?.tuning ?: emptyList()) else emptyList(), if (showFx) (car?.cond ?: emptyList()) else emptyList(),
+                x - 23f, by, cam, s, false, t, null, x, if (showFx) speed else (if (racing) 80f else 0f),
+            )
         }
         drawCar(rivalIdx[1], rivalCol[1], r2, hW - 26f, false)
         drawCar(rivalIdx[0], rivalCol[0], r1, hW - 17f, false)

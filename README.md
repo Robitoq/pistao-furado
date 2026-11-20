@@ -36,17 +36,33 @@ m("Marca", "Modelo", valorEmReais, Corpo, Categoria, anoInicial, anoFinal),
 
 Os valores e anos do catálogo são aproximados, feitos só para o jogo.
 
-## Carro novo (vetor, sem foto)
+## Veículos em pixel art (sprites em camadas)
 
-O carro agora é **desenhado no código** (`CarArt.kt`), não é mais uma imagem pintada com filtro, então a cor não bugua mais.
+Todos os veículos agora são **pixel art autoral** (nenhum asset de terceiros), desenhados em camadas por `Vehicles.kt`:
+`sombra → interior + motorista → poço da roda → RODAS → carroceria`. A carroceria tem os arcos de roda recortados e
+os vidros translúcidos, então a roda "entra" no paralama e o motorista aparece pela janela.
 
-- **Formas**: tabela `CAR_SHAPES` (13 carrocerias). Cada uma é uma lista de pontos, é só editar.
-- **Destruição**: objeto `Wear` (quantidade de ferrugem, desbotado, sujeira, amassados) e `RustColors`.
-- **Lataria** → ferrugem, tinta descascada, massa/primer, amassados, porta de outra cor, farol quebrado, para-choque pendurado, vidro trincado.
-- **Motor** → fumaça cinza/preta e faíscas. **Pneus** → careca, calota enferrujada, furado. **Interior** → banco rasgado. **Suspensão** → traseira arriada.
-- **Tuning** → rebaixada (`Wear.LOWER`), rodas, neon, película, adesivo, escape, turbo, som, couro, aerofólio, para-choque.
+- **Modelos**: Fusca, Kombi (bicolor), Uno Mille, Gol quadrado, Corsa, Opala (teto de vinil) + 15 carrocerias do catálogo.
+  Só no trânsito: **táxi do Rio** (amarelo com faixa azul e luminoso), **moto** e **moto-entrega**, **caminhão baú**,
+  **caminhão de carga (sacos)** e **ônibus** urbano.
+- **Cor**: a pintura usa 5 tons-marcador; em tempo de execução eles viram o degradê da cor escolhida (brilho/claro/base/sombra/escuro). Sem filtro lavado.
+- **Desgaste** (assado no sprite, em cache): ferrugem, tinta desbotada, massa/primer, amassados, riscos, sujeira, porta de outra cor, farol quebrado, vidro trincado.
+- **Rodas**: atlas com 6 quadros de giro + quadro borrado em alta velocidade; variantes aço, esportiva, enferrujada, pneu gasto e furado. Posições vêm de `VehicleData.kt` (gerado junto da arte), então **não desalinham**.
+- **Motor** → fumaça/faíscas. **Interior** → banco rasgado/couro. **Suspensão** → traseira arriada. **Tuning** → rebaixada, rodas, neon, película, adesivo, escape, turbo, som, couro, aerofólio, para-choque.
+- **Trânsito**: cada carro mantém distância do da frente (ninguém se atravessa), freia se o jogador parar na faixa, e o jogador ultrapassa pelo meio. Ordem de desenho por profundidade (y do chão).
+
+### Como editar a arte
+```
+cd tools/gen
+python3 build_assets.py     # requer Python 3 + pillow + numpy
+```
+Isso regrava todos os PNG em `app/src/main/assets/city/` e o `VehicleData.kt`. As silhuetas ficam em `heroes.py` / `models.py`,
+as rodas em `wheels.py`, prédios em `scenery.py`, adereços em `props.py`. `scene_test.py` monta uma cena de teste.
+Os PNG de carro usam cores-marcador magenta (veja `px.py`): não use esses tons para outras coisas.
 
 ## Cidade (ajustada)
+
+- **Cenário brasileiro**: sobrados com portão de garagem, casas de laje com tijolo aparente e caixa d'água, prédios com varanda e ar-condicionado, padaria, farmácia, mercado, boteco com bandeirinhas, igrejinha, kitnet; postes de concreto com cruzeta, transformador e fios emaranhados; coqueiro, mangueira e ipê; placas PARE/estacionamento/lombada; ponto de ônibus, orelhão, carrinho de milho; calçada de concreto e de **pedra portuguesa**, faixa amarela central, faixa de pedestres.
 
 - **Bugs de camada corrigidos**: janelas acesas, estrelas e letreiros não aparecem mais por cima de pessoas, carros e balões de fala. Balões não saem da tela nem se empilham.
 - **Menos cara de IA**: prédios do fundo irregulares (antena, caixa d'água, janelas acesas variadas), calçada com juntas e rachaduras diferentes, bueiros, remendos de asfalto, poças, faixa gasta, fios com passarinho, lixeiras, sacos de lixo, gatos e vasos de planta, postes em espaçamento irregular.

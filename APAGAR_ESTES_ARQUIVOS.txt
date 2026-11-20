@@ -1,0 +1,10 @@
+app/src/main/assets/city/car1.png
+app/src/main/assets/city/car2.png
+app/src/main/assets/city/car3.png
+app/src/main/assets/city/car4.png
+app/src/main/assets/city/car5.png
+app/src/main/assets/city/car6.png
+app/src/main/assets/city/car7.png
+app/src/main/assets/city/car8.png
+app/src/main/assets/city/car9.png
+app/src/main/assets/city/lamp.png

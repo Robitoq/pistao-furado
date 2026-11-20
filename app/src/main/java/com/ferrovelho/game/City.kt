@@ -38,6 +38,7 @@ import androidx.compose.ui.window.Dialog
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -92,10 +93,14 @@ private fun saveProfile(p: SharedPreferences, c: PlayerProfile) {
         .putBoolean("glasses", l.glasses).apply()
 }
 
+const val BLD_N = 16
+
 class CitySprites(
-    val bld: List<ImageBitmap>, val tree: List<ImageBitmap>, val lamp: ImageBitmap,
-    val sign: List<ImageBitmap>, val cars: List<ImageBitmap>, val win: List<ImageBitmap>,
+    val bld: List<ImageBitmap>, val tree: List<ImageBitmap>, val lamp: List<ImageBitmap>,
+    val sign: List<ImageBitmap>, val veh: VehSet, val win: List<ImageBitmap>,
     val tl: ImageBitmap, val bench: ImageBitmap,
+    val busStop: ImageBitmap, val phone: ImageBitmap, val cart: ImageBitmap,
+    val walk: List<ImageBitmap>, val road: ImageBitmap,
 ) {
     companion object {
         private var cache: CitySprites? = null
@@ -108,33 +113,33 @@ class CitySprites(
                 android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
             }
             return CitySprites(
-                List(12) { img("b$it") }, List(2) { img("t$it") }, img("lamp"),
-                List(3) { img("sign$it") }, List(9) { img("car${it + 1}") }, List(12) { img("w$it") },
+                List(BLD_N) { img("b$it") }, List(3) { img("t$it") }, List(2) { img("lamp$it") },
+                List(3) { img("sign$it") }, loadVehicles(ctx), List(BLD_N) { img("w$it") },
                 img("tl"), img("bench"),
+                img("busstop"), img("phone"), img("cart"),
+                List(2) { img("walk$it") }, img("road0"),
             )
         }
     }
 }
 
-fun carSpriteFor(b: Body): Int = when (b) {
-    Body.BOXY -> 0; Body.COMPACT -> 1; Body.WAGON -> 2; Body.MPV -> 4; Body.HATCH -> 1
-    Body.SEDAN -> 5; Body.SUV -> 6; Body.PICKUP -> 8; Body.COUPE -> 3; Body.CLASSIC -> 7
-    Body.VAN -> 4; Body.BEETLE -> 1; Body.SUPER -> 3
-    Body.UNO -> 0; Body.GOL -> 1; Body.NOTCH -> 5; Body.OPALA -> 7; Body.MUSCLE -> 3
-    Body.P911 -> 3; Body.JEEP -> 6; Body.MINI -> 1
-    else -> 5
-}
+/** carroceria do catálogo -> sprite de veículo (ver Vehicles.kt) */
+fun carSpriteFor(b: Body): Int = vehicleFor(b)
 
-// centros das rodas (x1, x2, raio) de cada sprite de carro
-val CAR_WHEELS = listOf(
-    Triple(16f, 52f, 4.5f), Triple(12f, 43f, 5f), Triple(16f, 52f, 4.5f), Triple(15.5f, 47.5f, 4.5f),
-    Triple(16f, 47f, 5f), Triple(18f, 54f, 5f), Triple(12f, 46f, 5f), Triple(17f, 50f, 4.5f), Triple(11f, 38f, 5f),
-)
-
-// kind: 0 prédio, 1 árvore, 2 poste, 3 placa, 4 semáforo, 5 banco
+// kind: 0 prédio, 1 árvore, 2 poste, 3 placa, 4 semáforo, 5 banco, 6 lixeira, 7 saco, 8 gato, 9 vaso, 10 ponto de ônibus, 11 orelhão, 12 carrinho
 private class Item(val kind: Int, val idx: Int, val x: Float)
 private class Ped(val look: Look, val base: Float, val phase: Float)
-private class Traffic(val spr: Int, val x0: Float, val speed: Float, val lane: Int, val driver: Look)
+/** Carro do trânsito: tem estado (posição/velocidade) e mantém distância do da frente. lane 0 = vai pra direita (faixa de cima), 1 = esquerda (faixa de baixo). */
+private class Traffic(
+    val spr: Int, val lane: Int, var x: Float, val v0: Float, val driver: Look,
+    val color: Int, val cond: List<Int>, val len: Float,
+) {
+    var v: Float = v0
+    var dist: Float = 0f
+}
+
+/** desgaste dos carros do ferro-velho (lataria destruída, pneu gasto) */
+private val JUNK_COND = listOf(30, 12, 40, 40, 40)
 
 private fun genCity(spr: CitySprites): List<Item> {
     val r = Random(11)
@@ -144,17 +149,17 @@ private fun genCity(spr: CitySprites): List<Item> {
         val yx = PLACE_X.firstOrNull { x + 80f > it - 110f && x < it + 110f }
         if (yx != null) { x = yx + 110f; continue }
         if (r.nextInt(100) < 18) {
-            out.add(Item(1, r.nextInt(2), x + 10f)); out.add(Item(1, r.nextInt(2), x + 45f))
+            out.add(Item(1, r.nextInt(3), x + 10f)); out.add(Item(1, r.nextInt(3), x + 45f))
             if (r.nextBoolean()) out.add(Item(3, r.nextInt(3), x + 70f))
             x += 100f
         } else {
-            val i = r.nextInt(12)
+            val i = r.nextInt(BLD_N)
             out.add(Item(0, i, x))
             x += spr.bld[i].width + r.nextInt(4, 24)
         }
     }
     var lx = 60f
-    while (lx < WORLD) { out.add(Item(2, 0, lx)); lx += 95f + r.nextInt(55) }
+    while (lx < WORLD) { out.add(Item(2, if (r.nextInt(3) == 0) 1 else 0, lx)); lx += 95f + r.nextInt(55) }
     var k = 0
     while (350f + 700f * k < CITY_END) { out.add(Item(4, 0, 350f + 700f * k)); k++ }
     k = 0
@@ -164,7 +169,7 @@ private fun genCity(spr: CitySprites): List<Item> {
     while (pxx < CITY_END - 60f) {
         pxx += 55f + r.nextInt(110)
         if (PLACE_X.any { abs(pxx - it) < 100f }) continue
-        out.add(Item(6 + r.nextInt(4), r.nextInt(2), pxx))
+        out.add(Item(6 + r.nextInt(7), r.nextInt(2), pxx))
     }
     // sem banco nem semáforo em cima da casa e do encontro
     out.removeAll { (it.kind == 4 || it.kind == 5) && NEW_PLACES.any { p -> abs(it.x - p) < 75f } }
@@ -194,69 +199,27 @@ fun DrawScope.wr(c: Color, x: Float, y: Float, w: Float, h: Float, cam: Float, s
     drawRect(c, Offset((x - cam) * s, y * s), Size(w * s, h * s))
 }
 
-fun DrawScope.drawWheels(ci: Int, left: Float, top: Float, u: Float, h: Float, rot: Float, sport: Boolean = false) {
-    val wh = CAR_WHEELS[ci.coerceIn(0, CAR_WHEELS.lastIndex)]
-    for (cx in listOf(wh.first, wh.second)) {
-        val c = Offset(left + cx * u, top + (h - 5.5f) * u)
-        val r = wh.third * u
-        drawCircle(Color(0xFF15161A), r, c)
-        drawCircle(if (sport) Color(0xFFFFC107) else Color(0xFF8E9399), r * (if (sport) 0.75f else 0.62f), c)
-        if (sport) drawCircle(Color(0xFF3A2E00), r * 0.58f, c)
-        val n = if (sport) 6 else 5
-        for (j in 0 until n) {
-            val a = rot + j * (6.2832f / n)
-            drawLine(if (sport) Color(0xFFFFE082) else Color(0xFF4A4F57), c, Offset(c.x + cos(a) * r * 0.62f, c.y + sin(a) * r * 0.62f), r * (if (sport) 0.2f else 0.16f))
-        }
-        drawCircle(if (sport) Color(0xFF5D4B00) else Color(0xFFD7DBE0), r * 0.2f, c)
-    }
-}
-
-// posição da cabeça do motorista em cada sprite (x do centro, y do topo), na janela
-val DRIVER_POS_PUBLIC get() = DRIVER_POS
-private val DRIVER_POS = listOf(
-    33f to 2.8f, 27f to 3f, 34f to 3.2f, 33f to 3.6f, 30f to 3f, 33f to 4f, 30f to 7.5f, 32f to 4f, 25f to 3.2f,
-)
-
-fun DrawScope.drawDriver(l: Look, ci: Int, left: Float, top: Float, u: Float) {
-    val p = DRIVER_POS[ci.coerceIn(0, DRIVER_POS.lastIndex)]
-    val x = left + (p.first - 2f) * u
-    val y = top + p.second * u
-    val dark = Color(0xFF212121)
-    drawRect(CTOP[l.top], Offset(x - 0.8f * u, y + 4f * u), Size(5.6f * u, 2f * u))
-    drawRect(CSKIN[l.skin], Offset(x + 1.2f * u, y + 3.6f * u), Size(1.6f * u, 0.6f * u))
-    drawRect(CSKIN[l.skin], Offset(x, y), Size(4f * u, 4f * u))
-    when (l.hairStyle) {
-        3 -> {}
-        5 -> {
-            drawRect(CTOP[l.top], Offset(x - 0.2f * u, y - 0.8f * u), Size(4.4f * u, 1.6f * u))
-            drawRect(dark, Offset(x + 3.4f * u, y + 0.2f * u), Size(1.8f * u, 0.6f * u))
-        }
-        else -> drawRect(CHAIR[l.hair], Offset(x - 0.2f * u, y - 0.8f * u), Size(4.4f * u, 1.8f * u))
-    }
-    if (l.hairStyle == 1) drawRect(CHAIR[l.hair], Offset(x - 0.6f * u, y), Size(1f * u, 4.6f * u))
-    drawRect(dark, Offset(x + 2.6f * u, y + 1.7f * u), Size(0.8f * u, 1f * u))
-    if (l.glasses) drawRect(dark, Offset(x + 2f * u, y + 1.4f * u), Size(2.2f * u, 0.4f * u))
-}
-
+/**
+ * Desenha um sprite estático (prédio, árvore, poste...). wx/by em unidades do mundo (by = chão do sprite).
+ * Posição e tamanho são ARREDONDADOS (antes eram truncados: o sprite "tremia" e os pixels ficavam desiguais).
+ * Os veículos NÃO usam esta função: eles usam drawVehWorld (Vehicles.kt).
+ */
 fun DrawScope.sp(
     img: ImageBitmap, wx: Float, by: Float, cam: Float, s: Float,
     k: Float = 1f, flip: Boolean = false, tint: Color? = null, alpha: Float = 1f,
-    carIdx: Int = -1, rot: Float = 0f, driver: Look? = null,
 ) {
-    val w = img.width * k * s
-    val h = img.height * k * s
-    val dx = (wx - cam) * s
-    val dy = by * s - h
-    if (dx + w < 0f || dx > size.width) return
+    val x0 = ((wx - cam) * s).roundToInt()
+    val x1 = ((wx - cam + img.width * k) * s).roundToInt()
+    val y1 = (by * s).roundToInt()
+    val y0 = ((by - img.height * k) * s).roundToInt()
+    if (x1 < 0 || x0 > size.width) return
     val filter = tint?.let { ColorFilter.tint(it, BlendMode.SrcAtop) }
     val body: DrawScope.() -> Unit = {
-        drawImage(img, IntOffset.Zero, IntSize(img.width, img.height), IntOffset(dx.toInt(), dy.toInt()),
-            IntSize(w.toInt().coerceAtLeast(1), h.toInt().coerceAtLeast(1)), alpha,
+        drawImage(img, IntOffset.Zero, IntSize(img.width, img.height), IntOffset(x0, y0),
+            IntSize((x1 - x0).coerceAtLeast(1), (y1 - y0).coerceAtLeast(1)), alpha,
             androidx.compose.ui.graphics.drawscope.Fill, filter, BlendMode.SrcOver, FilterQuality.None)
-        if (carIdx >= 0) drawWheels(carIdx, dx, dy, k * s, img.height.toFloat(), rot)
-        if (driver != null && carIdx >= 0) drawDriver(driver, carIdx, dx, dy, k * s)
     }
-    if (flip) withTransform({ scale(-1f, 1f, Offset(dx + w / 2f, dy)) }) { body() } else body()
+    if (flip) withTransform({ scale(-1f, 1f, Offset((x0 + x1) / 2f, 0f)) }) { body() } else body()
 }
 
 /** Boneco 12x26 unidades. left/top em px, c = px por unidade. walk 0..1 (andando), ph = fase da animação. */
@@ -527,10 +490,35 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
         List(80) { val r = Random(it + 5); Ped(randomLook(r), r.nextFloat() * WORLD, r.nextFloat() * 6f) }
     }
     val traffic = remember {
-        List(44) {
+        val per = 22
+        val slot = WORLD / per
+        List(per * 2) {
             val r = Random(it + 40)
             val lane = it % 2
-            Traffic(r.nextInt(9), r.nextFloat() * WORLD, (25 + r.nextInt(25)) * (if (lane == 0) 1f else -1f), lane, randomLook(r))
+            val j = it / 2
+            val roll = r.nextInt(100)
+            val sp = when {
+                roll < 9 -> V_TAXI
+                roll < 17 -> if (r.nextBoolean()) V_MOTO else V_MOTO_ENTREGA
+                roll < 23 -> if (r.nextBoolean()) V_TRUCK_BAU else V_TRUCK_MADEIRA
+                roll < 28 -> V_BUS
+                else -> r.nextInt(V_GARAGE)
+            }
+            val v0 = when (sp) {
+                V_BUS -> 24f + r.nextInt(8)
+                V_TRUCK_BAU, V_TRUCK_MADEIRA -> 22f + r.nextInt(8)
+                V_MOTO, V_MOTO_ENTREGA -> 38f + r.nextInt(18)
+                else -> 26f + r.nextInt(24)
+            }
+            val col = when (sp) {
+                V_TAXI -> 7
+                V_BUS -> intArrayOf(5, 6, 0, 4)[r.nextInt(4)]
+                V_TRUCK_BAU, V_TRUCK_MADEIRA -> intArrayOf(0, 5, 4, 6, 2)[r.nextInt(5)]
+                else -> r.nextInt(PAINTS.size)
+            }
+            val lat = intArrayOf(100, 100, 100, 85, 60, 35)[r.nextInt(6)]
+            // um carro por "fatia" da pista (com folga): ninguém nasce em cima de ninguém
+            Traffic(sp, lane, j * slot + r.nextFloat() * slot * 0.5f, v0, randomLook(r), col, listOf(100, lat, 100, 100, 100), vehLen(sp))
         }
     }
     val stars = remember { val r = Random(3); List(70) { Offset(r.nextFloat(), r.nextFloat()) } }
@@ -569,6 +557,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var driveDlg by remember { mutableStateOf(false) }
     var dragDlg by remember { mutableStateOf(false) }
     var vel by remember { mutableFloatStateOf(0f) }
+    var laneY by remember { mutableFloatStateOf(133f) }
     var odo by remember { mutableFloatStateOf(0f) }
     val engine = remember { EngineSound() }
     DisposableEffect(Unit) { onDispose { engine.release() } }
@@ -685,6 +674,53 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             face = dir
                         }
                     }
+                    // ---- faixa do jogador: ultrapassa o trânsito mais lento pela faixa do meio (sem atravessar ninguém)
+                    if (dc != null) {
+                        val lane = if (face < 0) 1 else 0
+                        var targetG = if (lane == 0) 133f else 148f
+                        if (abs(vel) > 40f) {
+                            val pp = if (lane == 0) px else WORLD - px
+                            for (c in traffic) {
+                                if (c.lane != lane) continue
+                                val pc = if (lane == 0) c.x else WORLD - c.x
+                                var d = pc - pp
+                                if (d < -WORLD / 2f) d += WORLD
+                                if (d > WORLD / 2f) d -= WORLD
+                                if (d > -vehLen(c.spr) - 24f && d < 70f && c.v < abs(vel) - 5f) { targetG = 140.5f; break }
+                            }
+                        }
+                        laneY += (targetG - laneY) * minOf(1f, 5f * dt)
+                    } else {
+                        laneY = 133f
+                    }
+                    // ---- trânsito: cada carro mantém distância do da frente (e do jogador, se ele parar na faixa)
+                    for (c in traffic) {
+                        val pc = if (c.lane == 0) c.x else WORLD - c.x
+                        var gap = 1e9f
+                        var lv = c.v0
+                        for (o in traffic) {
+                            if (o === c || o.lane != c.lane) continue
+                            val po = if (o.lane == 0) o.x else WORLD - o.x
+                            var d = po - pc
+                            if (d < 0f) d += WORLD
+                            val gg = d - (c.len + o.len) / 2f - 4f
+                            if (gg < gap) { gap = gg; lv = o.v }
+                        }
+                        if (dc != null && (if (face < 0) 1 else 0) == c.lane && abs(laneY - (if (c.lane == 0) 133f else 148f)) < 4f) {
+                            val pp = if (c.lane == 0) px else WORLD - px
+                            var d = pp - pc
+                            if (d < 0f) d += WORLD
+                            val gg = d - (c.len + vehLen(carSpriteFor(CATALOG[dc.model].body))) / 2f - 4f
+                            if (gg < gap) { gap = gg; lv = maxOf(0f, vel * (if (c.lane == 0) 1f else -1f)) }
+                        }
+                        val tgt = if (gap > 34f) c.v0 else if (gap <= 0f) 0f else minOf(c.v0, lv + gap * 1.2f)
+                        c.v += (tgt - c.v) * minOf(1f, 3f * dt)
+                        val step = if (gap <= 0f) 0f else minOf(c.v * dt, gap)
+                        c.x += step * (if (c.lane == 0) 1f else -1f)
+                        if (c.x >= WORLD) c.x -= WORLD
+                        if (c.x < 0f) c.x += WORLD
+                        c.dist += step
+                    }
                 }
                 last = n
             }
@@ -772,23 +808,33 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
 
             // ================= MUNDO (durante o dia: cenário parado) =================
             withTransform({ translate(0f, oy) }) {
-                // calçada com juntas irregulares
-                wr(Color(0xFFB7C4CB), cam, 104f, VIEW_W, 14f, cam, s)
-                var si = (cam / 14f).toInt() - 1
-                while (si * 14f < cam + VIEW_W + 14f) {
-                    wr(Color(0xFFA2B1B9), si * 14f + (hsh(si) % 3), 104f, 0.6f, 14f, cam, s)
-                    si++
+                // calçada: placas de concreto e trechos de pedra portuguesa (tiles de 32)
+                var wi = (cam / 32f).toInt() - 1
+                while (wi * 32f < cam + VIEW_W + 32f) {
+                    sp(spr.walk[if (hsh(wi / 3 + 11) % 3 == 0) 1 else 0], wi * 32f, 118f, cam, s)
+                    wi++
                 }
-                wr(Color(0xFF8A9AA3), cam, 117f, VIEW_W, 1.6f, cam, s)
-                wr(Color(0xFF4A5E6A), cam, 118.6f, VIEW_W, 31.4f, cam, s)
-                wr(Color(0xFF3E505B), cam, 140f, VIEW_W, 10f, cam, s)
+                wr(Color(0xFF8A9AA3), cam, 117f, VIEW_W, 2f, cam, s)
+                // meio-fio pintado (branco) em trechos
+                var cb = (cam / 40f).toInt() - 1
+                while (cb * 40f < cam + VIEW_W + 40f) {
+                    wr(Color(0xFFE8ECEE), cb * 40f + (hsh(cb) % 7), 117f, 14f, 1.6f, cam, s)
+                    cb++
+                }
+                // asfalto (textura) + faixa branca de borda
+                var rk = (cam / 48f).toInt() - 1
+                while (rk * 48f < cam + VIEW_W + 48f) {
+                    sp(spr.road, rk * 48f, 150f, cam, s)
+                    rk++
+                }
+                wr(Color(0xFFECEFF1).copy(alpha = 0.55f), cam, 121f, VIEW_W, 0.8f, cam, s)
                 // marcas de uso: faixa gasta, bueiro, remendo, poça, rachadura, papel no chão
                 val k0 = (cam / 26f).toInt() - 1
                 val k1 = ((cam + VIEW_W) / 26f).toInt() + 2
                 for (k in k0..k1) {
                     val h = hsh(k * 977 + 13)
                     val cx = k * 26f + (h % 9)
-                    wr(Color(0xFFECEFF1).copy(alpha = 0.55f + (h / 11 % 4) * 0.1f), cx + 2f, 133.5f, 10f + (h / 3 % 5), 1.2f, cam, s)
+                    wr(Color(0xFFF2C230).copy(alpha = 0.75f + (h / 11 % 4) * 0.06f), cx + 2f, 140f, 11f + (h / 3 % 3), 1.2f, cam, s)
                     when ((h / 7) % 9) {
                         0 -> {
                             wr(Color(0xFF2B363D), cx + 6f, 126f, 8f, 3f, cam, s)
@@ -819,27 +865,13 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             wr(Color(0x33000000), ci.x, 101f, bw, 3f, cam, s)
                             sp(spr.bld[ci.idx], ci.x, 104f, cam, s)
                             wr(Color(0x14000000), ci.x, 98f, bw, 6f, cam, s)
-                            val hv = hsh(ci.idx * 31 + ci.x.toInt())
-                            val topY = 104f - bh
-                            when (hv % 4) {
-                                0 -> {
-                                    val tx = ci.x + 3f + (hv / 4 % (bw - 14f).toInt().coerceAtLeast(1))
-                                    wr(Color(0xFF6D6D72), tx, topY - 6f, 9f, 6f, cam, s)
-                                    wr(Color(0xFF55555A), tx - 0.4f, topY - 7f, 9.8f, 1.2f, cam, s)
-                                }
-                                1 -> {
-                                    val ax = ci.x + bw * 0.3f
-                                    wr(Color(0xFF2B2B2F), ax, topY - 9f, 0.7f, 9f, cam, s)
-                                    wr(Color(0xFF2B2B2F), ax - 3f, topY - 8f, 6.6f, 0.6f, cam, s)
-                                    wr(Color(0xFF2B2B2F), ax - 2f, topY - 5.5f, 4.6f, 0.6f, cam, s)
-                                }
-                                else -> {}
-                            }
                         }
                         1 -> sp(spr.tree[ci.idx], ci.x, 112f, cam, s)
-                        2 -> sp(spr.lamp, ci.x, 116f, cam, s)
-                        3 -> sp(spr.sign[ci.idx], ci.x, 112f, cam, s, 0.6f)
+                        2 -> sp(spr.lamp[ci.idx.coerceIn(0, 1)], ci.x, 116f, cam, s)
+                        3 -> sp(spr.sign[ci.idx], ci.x, 112f, cam, s)
                         4 -> {
+                            // faixa de pedestres (zebra) ao lado do semáforo
+                            for (zi in 0..5) wr(Color(0xFFF4F4F4).copy(alpha = 0.8f), ci.x + 14f + zi * 6f, 122f, 3f, 26f, cam, s)
                             sp(spr.tl, ci.x, 116f, cam, s)
                             val ph = (t * 0.12f + ci.x * 0.003f) % 1f
                             val li = if (ph < 0.45f) 2 else if (ph < 0.55f) 1 else 0
@@ -875,13 +907,17 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             wr(Color(0xFF212121), ci.x + 5.4f, by - 5.1f, 0.5f, 0.6f, cam, s)
                             wr(fur, ci.x - 2f, by - 2.2f + sw, 2.2f, 0.9f, cam, s)
                         }
-                        else -> {   // vaso de planta
+                        9 -> {   // vaso de planta
                             val by = 113.5f
                             wr(Color(0xFFB0643A), ci.x, by - 3.6f, 4.4f, 3.6f, cam, s)
                             wr(Color(0xFF8E4D2B), ci.x - 0.3f, by - 4.2f, 5f, 0.9f, cam, s)
                             wr(Color(0xFF2E8B3A), ci.x - 0.6f, by - 7.6f, 5.6f, 3.6f, cam, s)
                             wr(Color(0xFF3FA84C), ci.x + 1f, by - 9f, 2.6f, 2f, cam, s)
                         }
+                        10 -> sp(spr.busStop, ci.x, 112f, cam, s)   // ponto de ônibus
+                        11 -> sp(spr.phone, ci.x, 112f, cam, s)     // orelhão
+                        12 -> sp(spr.cart, ci.x, 112f, cam, s)      // carrinho de milho
+                        else -> {}
                     }
                 }
 
@@ -896,6 +932,11 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         quadraticBezierTo((x0 + x1) / 2f, 93f * s, x1, 86.5f * s)
                     }
                     drawPath(wire, Color(0xFF2B2B33).copy(alpha = 0.8f), style = Stroke(width = 0.4f * s))
+                    val wire2 = Path().apply {
+                        moveTo(x0, 88f * s)
+                        quadraticBezierTo((x0 + x1) / 2f, 96f * s, x1, 88f * s)
+                    }
+                    drawPath(wire2, Color(0xFF2B2B33).copy(alpha = 0.6f), style = Stroke(width = 0.35f * s))
                     if (night < 0.5f && hsh(i * 5 + 1) % 3 == 0) {
                         val tt = 0.3f + (hsh(i) % 40) / 100f
                         val bx = (1f - tt) * (1f - tt) * x0 + 2f * (1f - tt) * tt * ((x0 + x1) / 2f) + tt * tt * x1
@@ -911,11 +952,13 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     if (yx + 100f < cam || yx - 100f > cam + VIEW_W) return@forEachIndexed
                     wr(Color(0xFF5D4037), yx - 85f, 72f, 170f, 32f, cam, s)
                     wr(Color(0xFF4E342E), yx - 85f, 96f, 170f, 8f, cam, s)
-                    val tint = Color(0x66554433)
-                    sp(spr.cars[(i * 2) % 9], yx - 82f, 104f, cam, s, 1f, false, tint)
-                    sp(spr.cars[(i * 3 + 1) % 9], yx - 76f, 84f, cam, s, 1f, true, tint)
-                    sp(spr.cars[(i * 5 + 2) % 9], yx + 24f, 104f, cam, s, 1f, i % 2 == 0, tint)
-                    sp(spr.cars[(i * 7 + 4) % 9], yx + 30f, 84f, cam, s, 0.9f, false, tint)
+                    // carcaças: lataria destruída "assada" no sprite (ferrugem, primer, amassados)
+                    fun junk(n: Int, cxw: Float, gr: Float, fl: Boolean) =
+                        drawVehWorld(spr.veh, n % V_GARAGE, Color(PAINTS[(n * 3 + i) % PAINTS.size].second), emptyList(), JUNK_COND, cxw, gr, cam, s, fl, t, null, 0f, 0f)
+                    junk(i * 2, yx - 51f, 104f, false)
+                    junk(i * 3 + 1, yx - 45f, 84f, true)
+                    junk(i * 5 + 2, yx + 55f, 104f, i % 2 == 0)
+                    junk(i * 7 + 4, yx + 61f, 84f, false)
                     for (k in 0..2) {
                         drawCircle(Color(0xFF1B1B1B), 4f * s, Offset((yx - 30f + k * 0f - cam) * s, (101f - k * 7f) * s))
                         drawCircle(Color(0xFF6B6B6B), 1.6f * s, Offset((yx - 30f - cam) * s, (101f - k * 7f) * s))
@@ -999,8 +1042,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 if (meetOn && MEET_X + 110f > cam && MEET_X - 110f < cam + VIEW_W) {
                     meetField.take(3).forEachIndexed { i, mc ->
                         val si = carSpriteFor(CATALOG[mc.model].body)
-                        val tintC = Color(PAINTS[mc.color].second).copy(alpha = 0.35f)
-                        sp(spr.cars[si], MEET_X - 100f + i * 66f, 112f, cam, s, 0.95f, i == 1, tintC, 1f, si, 0f, null)
+                        drawVehWorld(spr.veh, si, Color(PAINTS[mc.color.coerceIn(0, PAINTS.lastIndex)].second), mc.tuning, mc.cond,
+                            MEET_X - 69f + i * 66f, 112f, cam, s, i == 1, t, null, 0f, 0f)
                     }
                     meetField.forEachIndexed { i, mc ->
                         val ox = MEET_X - 88f + i * 42f
@@ -1008,36 +1051,37 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     }
                 }
                 val dcar = g.garage.firstOrNull { it.id == driveId }
-                if (dcar != null) {
-                    val csi = carSpriteFor(CATALOG[dcar.model].body)
-                    val cimg = spr.cars[csi]
-                    val ctint = Color(PAINTS[dcar.color].second).copy(alpha = 0.35f)
-                    val laneY = if (face < 0) 148f else 133f
-                    val ck = 1.1f
-                    val cshape = shapeFor(CATALOG[dcar.model].body)
-                    val cpaint = Color(PAINTS[dcar.color.coerceIn(0, PAINTS.lastIndex)].second)
-                    val cseed = CATALOG[dcar.model].body.ordinal * 17 + dcar.color * 5 + 3
-                    val left = (px - 31f * ck - cam) * s
-                    val topY = laneY * s - 22.5f * ck * s
-                    withTransform({
-                        if (face < 0) scale(-1f, 1f, Offset((px - cam) * s, topY))
-                        translate(left, topY)
-                        scale(ck * s, ck * s, Offset.Zero)
-                    }) {
-                        drawCarUnits(cshape, cseed, cpaint, dcar.tuning, dcar.cond, t, look)
-                    }
-                } else {
+                if (dcar == null) {
                     drawChar(look, (px - 6f - cam) * s, (115f - 26f) * s, s, face < 0, if (moving) 1f else 0f,
                         t * (if (run) 16f else 10f))
                 }
-                for (c in traffic) {
-                    val x = (((c.x0 + t * c.speed) % WORLD) + WORLD) % WORLD
-                    if (x < cam - 90f || x > cam + VIEW_W + 10f) continue
-                    val img = spr.cars[c.spr]
-                    val rot = (t * abs(c.speed) + c.x0) / 4.5f
-                    if (c.lane == 0) sp(img, x, 133f, cam, s, 1.1f, false, null, 1f, c.spr, rot, c.driver)
-                    else sp(img, x, 148f, cam, s, 1.1f, true, null, 1f, c.spr, rot, c.driver)
+                // ORDEM DE PROFUNDIDADE: quem tem o chão mais embaixo (y maior) fica na frente.
+                // faixa de cima (y=133) -> jogador (se estiver no meio, y~140) -> faixa de baixo (y=148)
+                var playerDrawn = dcar == null
+                fun drawPlayerCar() {
+                    val dc = dcar ?: return
+                    if (playerDrawn) return
+                    playerDrawn = true
+                    drawVehWorld(
+                        spr.veh, carSpriteFor(CATALOG[dc.model].body), Color(PAINTS[dc.color.coerceIn(0, PAINTS.lastIndex)].second),
+                        dc.tuning, dc.cond, px, laneY, cam, s, face < 0, t, look, odo, abs(vel),
+                    )
                 }
+                fun drawLane(lane: Int) {
+                    for (c in traffic) {
+                        if (c.lane != lane) continue
+                        if (c.x < cam - 100f || c.x > cam + VIEW_W + 100f) continue
+                        drawVehWorld(
+                            spr.veh, c.spr, Color(PAINTS[c.color.coerceIn(0, PAINTS.lastIndex)].second), emptyList(), c.cond,
+                            c.x, if (lane == 0) 133f else 148f, cam, s, lane == 1, t, c.driver, c.dist, c.v,
+                        )
+                    }
+                }
+                if (laneY < 133f) drawPlayerCar()
+                drawLane(0)
+                if (laneY < 148f) drawPlayerCar()
+                drawLane(1)
+                drawPlayerCar()
             }
             // à noite, rua e gente escurecem um pouco (pra não parecer recortado em cima da escuridão)
             if (night > 0f) {
@@ -1071,14 +1115,9 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             glow(lc, 7f * s, Color(0xFFFFF1C2).copy(alpha = 0.95f * night))
                         }
                     }
-                    for (c in traffic) {
-                        val x = (((c.x0 + t * c.speed) % WORLD) + WORLD) % WORLD
-                        if (x < cam - 90f || x > cam + VIEW_W + 60f) continue
-                        val wcar = spr.cars[c.spr].width * 1.1f
-                        val by = if (c.lane == 0) 133f else 148f
-                        val sgn = if (c.lane == 0) 1f else -1f
-                        val fx = if (c.lane == 0) x + wcar - 1f else x + 1f
-                        val fp = Offset((fx - cam) * s, (by - 6.5f) * s)
+                    fun carLamps(cxw: Float, by: Float, sgn: Float, si: Int) {
+                        val m = VMETA[si.coerceIn(0, V_COUNT - 1)]
+                        val fp = Offset((cxw + sgn * (m.hl[0] - m.cx) - cam) * s, (by - (m.gy - m.hl[1])) * s)
                         val beam = Path().apply {
                             moveTo(fp.x, fp.y - 1.2f * s); lineTo(fp.x + sgn * 48f * s, fp.y - 8f * s)
                             lineTo(fp.x + sgn * 48f * s, fp.y + 6f * s); lineTo(fp.x, fp.y + 1.2f * s); close()
@@ -1089,10 +1128,17 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             blendMode = BlendMode.Plus,
                         )
                         glow(fp, 5f * s, Color(0xFFFFFFFF).copy(alpha = 0.95f * night))
-                        val rx = if (c.lane == 0) x + 1f else x + wcar - 3f
-                        wr(Color(0xFFFF1744).copy(alpha = night), rx, by - 9f, 2f, 2f, cam, s)
-                        glow(Offset((rx + 1f - cam) * s, (by - 8f) * s), 5f * s, Color(0xFFFF1744).copy(alpha = 0.4f * night))
+                        val tx = cxw + sgn * (m.tl[0] - m.cx)
+                        val ty = by - (m.gy - m.tl[1])
+                        wr(Color(0xFFFF1744).copy(alpha = night), tx - 1f, ty - 1f, 2f, 2f, cam, s)
+                        glow(Offset((tx - cam) * s, ty * s), 5f * s, Color(0xFFFF1744).copy(alpha = 0.4f * night))
                     }
+                    for (c in traffic) {
+                        if (c.x < cam - 100f || c.x > cam + VIEW_W + 100f) continue
+                        carLamps(c.x, if (c.lane == 0) 133f else 148f, if (c.lane == 0) 1f else -1f, c.spr)
+                    }
+                    val nightCar = g.garage.firstOrNull { it.id == driveId }
+                    if (nightCar != null) carLamps(px, laneY, if (face < 0) -1f else 1f, carSpriteFor(CATALOG[nightCar.model].body))
                 }
             }
 
@@ -1603,7 +1649,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, female: Boolean, firs
                                 Modifier.fillMaxWidth().clickable { picked = c; speech = "Esse aí? Boa escolha. Quanto você paga?" }.padding(4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Image(spr.cars[carSpriteFor(m.body)], null, Modifier.width(64.dp).height(24.dp), filterQuality = FilterQuality.None)
+                                CarArt(m.body, c.color, emptyList(), c.cond, Modifier.width(72.dp).height(32.dp))
                                 Column { Text("${m.fullName} ${c.year}", fontSize = 13.sp); Text(brl(c.price), fontSize = 12.sp) }
                             }
                         }
@@ -1611,7 +1657,7 @@ private fun YardTalk(g: GameState, yi: Int, pname: String, female: Boolean, firs
                     TextButton(onClick = onClose) { Text("Sair") }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Image(spr.cars[carSpriteFor(CATALOG[y.model].body)], null, Modifier.width(64.dp).height(24.dp), filterQuality = FilterQuality.None)
+                        CarArt(CATALOG[y.model].body, y.color, emptyList(), y.cond, Modifier.width(72.dp).height(32.dp))
                         Column { Text("${CATALOG[y.model].fullName} ${y.year}", fontSize = 13.sp); Text("Preço agora: ${brl(cur)}", fontWeight = FontWeight.Bold) }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

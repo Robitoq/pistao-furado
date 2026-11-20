@@ -1,1 +1,1 @@
-Cidade: tileset CP_V1.1.0 (nyknck). Carros: 2D Pixel Cars (Digital Realms Studio). Confira as licencas dos pacotes.
+Veículos, prédios, árvores e adereços: gerados proceduralmente por tools/gen (autoral, sem assets de terceiros).
