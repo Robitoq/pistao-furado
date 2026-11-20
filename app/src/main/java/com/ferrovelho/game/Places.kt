@@ -141,6 +141,7 @@ fun NeedsBar(g: GameState) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         NeedMeter("🍔", g.hunger, Modifier.weight(1f))
         NeedMeter("🥤", g.thirst, Modifier.weight(1f))
+        NeedMeter("😴", g.energy, Modifier.weight(1f))   // sono: não trava o relógio, só deixa o personagem mais lento
     }
 }
 
@@ -531,6 +532,10 @@ private fun ColumnScope.WorkshopBody(g: GameState) {
         }
         val invested = car.paid + car.spent
         Text("Pago ${brl(car.paid)} • Oficina ${brl(car.spent)} • Total ${brl(invested)} • Vale ${brl(g.marketValue(car))}", fontSize = 11.sp)
+        Text(
+            "💪 ${carPower(car).toInt()} cv • 🏁 ${(carStreetSpeed(car) * 0.5f).toInt()} km/h • 🎛️ ${car.tuning.distinct().size}/${TUNINGS.size} peças instaladas",
+            fontSize = 11.sp, color = Color(0xFFB39DDB),
+        )
     }
     if (g.message.isNotEmpty()) Text(g.message, fontSize = 12.sp, color = Color(0xFFFFCA28))
 
@@ -562,10 +567,19 @@ private fun ColumnScope.WorkshopBody(g: GameState) {
                     }
                 }
             }
-            1 -> TUNINGS.chunked(2).forEach { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { t -> TuningCard(g, car, t, Modifier.weight(1f)) }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
+            1 -> {
+                Text("Cada peça instalada muda o carro de verdade: o desenho, o desempenho (turbo, escape...) e o valor de revenda. As peças ficam salvas neste carro.", fontSize = 12.sp)
+                TUNING_CATS.filter { it != "Pintura" }.forEach { cat ->
+                    Text(
+                        when (cat) { "Desempenho" -> "🚀 Desempenho"; "Visual" -> "🎨 Visual"; else -> "💺 Interior e som" },
+                        fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                    )
+                    TUNINGS.filter { it.cat == cat }.chunked(2).forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row.forEach { t -> TuningCard(g, car, t, Modifier.weight(1f)) }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
                 }
             }
             else -> {
@@ -583,6 +597,13 @@ private fun ColumnScope.WorkshopBody(g: GameState) {
                         }
                     }
                 }
+                Text("Acabamentos", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                TUNINGS.filter { it.cat == "Pintura" }.chunked(2).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { t -> TuningCard(g, car, t, Modifier.weight(1f)) }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -598,7 +619,7 @@ private fun CompanyTab(g: GameState) {
         Text("${g.motorsName()} — sua empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         RenameButton(g, "o", g.motorsName())
         Text("• Oficina aberta 24 horas\n• peças, tuning e pintura de graça pra você\n• Rende dinheiro todo dia com serviços de clientes", fontSize = 13.sp)
-        Text("Carros vendidos: ${g.sold}\nLucro total: ${brl(g.totalProfit)}", fontSize = 13.sp)
+        Text("Carros vendidos: ${g.sold}\nLucro total: ${brl(g.totalProfit)}\nReceita de consertos feitos por você na oficina: ${brl(g.shopRevenue)}", fontSize = 13.sp)
     } else {
         Text("Montar minha própria empresa", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text(

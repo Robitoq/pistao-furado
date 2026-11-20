@@ -52,9 +52,12 @@ import kotlinx.coroutines.delay
 /** A partir desse horário (19h) dá pra dormir. */
 const val SLEEP_FROM = 19 * 60
 
+/** Dá pra dormir à noite E de madrugada (o relógio passa da meia-noite sozinho, ninguém é obrigado a dormir). */
+fun canSleep(m: Int): Boolean = m >= SLEEP_FROM || m < 6 * 60
+
 @Composable
 fun HomeDialog(g: GameState, onSleep: () -> Unit, onClose: () -> Unit) {
-    val night = g.minutes >= SLEEP_FROM
+    val night = canSleep(g.minutes)
     Dialog(onDismissRequest = onClose) {
         Card {
             Column(
@@ -70,7 +73,7 @@ fun HomeDialog(g: GameState, onSleep: () -> Unit, onClose: () -> Unit) {
                     fontSize = 13.sp, textAlign = TextAlign.Center,
                 )
                 if (night) {
-                    Button(onClick = onSleep, Modifier.fillMaxWidth()) { Text("Dormir e acordar amanhã") }
+                    Button(onClick = onSleep, Modifier.fillMaxWidth()) { Text("Dormir até as 8h") }
                 } else {
                     OutlinedButton(
                         onClick = { g.spendTime(SLEEP_FROM - g.minutes) },
@@ -116,7 +119,7 @@ private fun Bedroom(night: Boolean) {
 
 /**
  * Cena de ir pra casa de táxi, dormir e acordar. Cobre a tela inteira.
- * Quando termina, o dia seguinte já começou (g.nextDay) e chama onDone.
+ * Quando termina, o relógio já foi até as 8h (g.nextDay avança o tempo de verdade) e chama onDone.
  */
 @Composable
 fun SleepScene(g: GameState, pname: String, female: Boolean, fromTaxi: Boolean, onDone: () -> Unit) {

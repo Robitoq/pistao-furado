@@ -600,7 +600,7 @@ fun GameState.buildLoja(lot: Int, type: Int, nome: String = "") {
     lojas = lojas + (lot to type)
     lojaPreco = lojaPreco + (lot to 1)
     if (nome.trim().isNotEmpty()) nomes = nomes + ("l$lot" to nome.trim().take(20))
-    message = "${lojaName(lot)} inaugurado! O lucro (ou prejuízo) vem toda vez que você dorme."
+    message = "${lojaName(lot)} inaugurado! O lucro (ou prejuízo) sai todo dia à meia-noite."
     save()
 }
 
@@ -750,7 +750,7 @@ fun LojaDialog(g: GameState, lot: Int, onClose: () -> Unit) {
                     } else {
                         RenameButton(g, "l$lot", g.lojaName(lot))
                         val lvl = g.lojaPreco[lot] ?: 1
-                        Text("Custo fixo: ${brl(LOJA_UPKEEP[type])} por dia. O resultado do dia sai quando você dorme.", fontSize = 13.sp)
+                        Text("Custo fixo: ${brl(LOJA_UPKEEP[type])} por dia. O resultado do dia sai à meia-noite.", fontSize = 13.sp)
                         val last = g.lojaUltimo[lot]
                         if (last != null) {
                             Text(

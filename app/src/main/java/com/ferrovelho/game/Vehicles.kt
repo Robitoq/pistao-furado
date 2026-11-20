@@ -305,8 +305,12 @@ fun DrawScope.drawVeh(
         withTransform({ translate((31 - m.cx).toFloat(), (22 - m.gy).toFloat()) }) {
             // ---- neon + sombra no chão
             if ("neon" in tuning) {
-                glow(Offset(m.cx.toFloat(), gy - 1f), 30f, Color(0xFF00E5FF).copy(alpha = 0.55f))
-                drawRect(Color(0xFF9CF3FF), Offset(m.rear + 5f, gy - 1f), Size((m.front - m.rear - 10).toFloat(), 1f))
+                // cor do neon alterna devagar entre ciano e magenta; luz espalhada no chão embaixo do carro
+                val mix = (0.5f + 0.5f * sin(t * 2f * PI.toFloat() * 0.35f)).coerceIn(0f, 1f)
+                val nc = Color(0xFF00E5FF).let { a -> Color(a.red + (1f - a.red) * mix, a.green * (1f - mix * 0.8f), a.blue + (0.6f - a.blue) * mix * 0.5f, 1f) }
+                glow(Offset(m.cx.toFloat(), gy - 1f), 34f, nc.copy(alpha = 0.55f))
+                drawRect(nc.copy(alpha = 0.28f), Offset(m.rear + 1f, gy - 1f), Size((m.front - m.rear - 2).toFloat(), 4f))
+                drawRect(nc, Offset(m.rear + 5f, gy - 1f), Size((m.front - m.rear - 10).toFloat(), 1f))
             }
             drawRect(Color(0x55000000), Offset(m.rear + 1f, gy), Size((m.front - m.rear - 1).toFloat(), 1f))
             drawRect(Color(0x2E000000), Offset(m.rear + 4f, gy + 1f), Size((m.front - m.rear - 7).toFloat(), 1f))
@@ -326,7 +330,13 @@ fun DrawScope.drawVeh(
                     else -> Color(0xFF37474F)
                 }
                 crect(seatCol, hx - 4, hy + 1, 3, 8, g0, gt, g1, gb)
-                if ("couro" in tuning) crect(Color(0xFF8D6E63), hx - 4, hy + 1, 3, 1, g0, gt, g1, gb)
+                if ("couro" in tuning) {
+                    crect(Color(0xFF8D6E63), hx - 4, hy + 1, 3, 1, g0, gt, g1, gb)
+                    crect(Color(0xFF4E342E), hx - 4, hy + 5, 3, 1, g0, gt, g1, gb)          // costura do encosto
+                    crect(Color(0xFF6D4C41), hx - 12, hy + 2, 3, 7, g0, gt, g1, gb)         // banco traseiro
+                    crect(Color(0xFF8D6E63), hx - 12, hy + 2, 3, 1, g0, gt, g1, gb)
+                    crect(Color(0xFF5D4037), hx + 3, hy + 6, 4, 3, g0, gt, g1, gb)          // painel de couro
+                }
                 if (inter < 45 && "couro" !in tuning) {
                     crect(Color(0xFFF2E6C9), hx - 3, hy + 2, 2, 2, g0, gt, g1, gb)
                     crect(Color(0xFF2B2B2B), hx - 2, hy + 4, 1, 2, g0, gt, g1, gb)
@@ -379,10 +389,39 @@ fun DrawScope.drawVeh(
 
             // ---- tuning por cima
             val bt = (m.bot - 4 + dy).toFloat()
+            if ("metalica" in tuning) {
+                // verniz metálico: brilho por cima da pintura (só onde há carroceria) + partículas correndo na lataria
+                img(body, 0, 0, w, h, 0, dy, ColorFilter.tint(Color(0x2EFFFFFF), BlendMode.SrcAtop))
+                val dx0 = m.door[0]
+                val dw = max(4, m.door[2] - m.door[0])
+                for (k in 0..3) {
+                    val p = (t * 0.7f + k * 0.27f) % 1f
+                    val sx = (dx0 + p * dw).roundToInt().toFloat()
+                    val sy = (m.door[1] + 1 + (k * 2) % max(2, m.door[3] - m.door[1] - 1) + dy).toFloat()
+                    drawRect(Color.White.copy(alpha = 0.85f * (1f - kotlin.math.abs(p - 0.5f) * 1.6f).coerceIn(0f, 1f)), Offset(sx, sy), Size(1f, 1f))
+                }
+            }
             if ("parachoque" in tuning) {
-                drawRect(Color(0xFF1B1B1B), Offset(m.front - 5f, bt), Size(7f, 4f))
-                drawRect(Color(0xFF424242), Offset(m.front - 5f, bt + 4f), Size(7f, 1f))
-                drawRect(Color(0xFF1B1B1B), Offset(m.rear - 2f, bt), Size(6f, 4f))
+                // dianteiro: lábio inferior escuro com friso vermelho + entradas de ar; traseiro: difusor
+                drawRect(Color(0xFF1B1B1B), Offset(m.front - 6f, bt), Size(8f, 4f))
+                drawRect(Color(0xFF424242), Offset(m.front - 6f, bt + 1f), Size(1f, 2f))
+                drawRect(Color(0xFF424242), Offset(m.front - 3f, bt + 1f), Size(1f, 2f))
+                drawRect(Color(0xFFD32F2F), Offset(m.front - 6f, bt + 4f), Size(8f, 1f))
+                drawRect(Color(0xFF1B1B1B), Offset(m.front - 5f, bt + 5f), Size(6f, 1f))
+                drawRect(Color(0xFF1B1B1B), Offset(m.rear - 3f, bt), Size(7f, 4f))
+                drawRect(Color(0xFF424242), Offset(m.rear - 3f, bt + 4f), Size(7f, 1f))
+                drawRect(Color(0xFF1B1B1B), Offset(m.rear - 2f, bt + 5f), Size(5f, 1f))
+            }
+            if ("farol" in tuning && m.headRect.size >= 4) {
+                // faróis LED personalizados: bloco azul-gelo com faixa de luz de direção (DRL) e brilho
+                val hrx = m.headRect[0].toFloat()
+                val hry = (m.headRect[1] + dy).toFloat()
+                val hrw = max(2, m.headRect[2]).toFloat()
+                val hrh = max(2, m.headRect[3]).toFloat()
+                drawRect(Color(0xFF0D47A1), Offset(hrx, hry), Size(hrw, hrh))
+                drawRect(Color(0xFFB3E5FC), Offset(hrx + 1f, hry), Size(max(1f, hrw - 1f), 1f))
+                drawRect(Color(0xFFFFFFFF), Offset(hrx + hrw - 1f, hry + 1f), Size(1f, max(1f, hrh - 1f)))
+                glow(Offset(hrx + hrw, hry + hrh / 2f), 6f, Color(0xFF40C4FF).copy(alpha = 0.55f))
             }
             if ("aerofolio" in tuning) {
                 val wx = m.wing[0].toFloat()
@@ -396,8 +435,19 @@ fun DrawScope.drawVeh(
                 drawRect(paintColor, Offset(wx + 8f, wy - 7f), Size(1f, 3f))
             }
             if ("escape" in tuning || "turbo" in tuning) {
+                // ponteira cromada grossa + fumacinha quando o carro anda
                 drawRect(Color(0xFFB0BEC5), Offset(m.rear - 3f, bt + 1f), Size(4f, 2f))
                 drawRect(Color(0xFF546E7A), Offset(m.rear - 3f, bt + 2f), Size(4f, 1f))
+                drawRect(Color(0xFFECEFF1), Offset(m.rear - 3f, bt + 1f), Size(1f, 1f))
+                if (speed > 4f && "turbo" !in tuning) {
+                    val pp = (t * 2.5f) % 1f
+                    drawRect(Color(0xFFBDBDBD).copy(alpha = 0.5f * (1f - pp)), Offset(m.rear - 4f - pp * 6f, bt + 1f - pp * 2f), Size(2f, 2f))
+                }
+            }
+            if ("turbo" in tuning) {
+                // entrada de ar (scoop) no capô
+                drawRect(Color(0xFF1B1B1B), Offset(m.front - 22f, m.hoodY.toFloat() - 1f), Size(8f, 2f))
+                drawRect(Color(0xFF616161), Offset(m.front - 22f, m.hoodY.toFloat() - 1f), Size(8f, 1f))
             }
             if ("turbo" in tuning) {
                 val fl = (1.5f + 3.5f * (0.5f + 0.5f * sin(t * 2f * PI.toFloat() * 3f))).roundToInt().toFloat()

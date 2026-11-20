@@ -42,13 +42,13 @@ import kotlin.random.Random
 // =====================================================================================
 
 /** Velocidade do carro andando pela cidade (unidades do mapa por segundo). */
-fun carStreetSpeed(c: OwnedCar): Float = 150f + c.cond[0] * 0.9f + c.tuning.size * 15f
+fun carStreetSpeed(c: OwnedCar): Float = 150f + c.cond[0] * 0.9f + perfSpeed(c.tuning).toFloat()
 
 /** Potência "em cv": depende do modelo, do motor (condição) e do tuning. */
 fun carPower(c: OwnedCar): Double {
     val base = CATALOG[c.model].base
     val hp = 60.0 + (base / 1000.0).pow(0.55) * 14.0
-    return hp * (0.6 + 0.4 * c.cond[0] / 100.0) * (1.0 + 0.04 * c.tuning.size)
+    return hp * (0.6 + 0.4 * c.cond[0] / 100.0) * perfPower(c.tuning)   // só peças de desempenho (turbo, escape...) dão potência
 }
 
 /** Motor sintetizado: frequência acompanha o giro, volume acompanha o acelerador. */

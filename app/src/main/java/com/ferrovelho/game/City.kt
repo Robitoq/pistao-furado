@@ -597,7 +597,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
         prefs.edit().putFloat("x", px).apply()
         if (paid < fare) g.message = "Sem dinheiro pro táxi? O motorista te deixou em casa mesmo assim."
         g.save()
-        if (g.minutes >= SLEEP_FROM) {
+        if (canSleep(g.minutes)) {
             sleepTaxi = true
             sleeping = true
         } else {
@@ -646,10 +646,15 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     if (nf > 0.6f && !saidNight) { saidNight = true; say = "Já escureceu! Encontro de carros ou casa?"; sayUntil = time + 4f }
                     if (nf < 0.2f) saidNight = false
                     // madrugada: o personagem apaga de sono e oferece o táxi pra casa
-                    if (g.minutes >= 23 * 60 + 20 && lateDay != g.day && !isBusy()) { lateDay = g.day; lateAsk = true }
+                    // sono é só uma necessidade: avisa, mas NUNCA trava o relógio nem tira o controle do jogador
+                    if (g.energy < 25.0 && lateDay != g.day && !isBusy()) {
+                        lateDay = g.day; say = "Tô morrendo de sono... dá pra continuar, mas rendo menos. Casa e cama ajudam."; sayUntil = time + 4.5f
+                    }
                     val dc = g.garage.firstOrNull { it.id == driveId }
-                    if (dc != null) {
-                        val maxV = carStreetSpeed(dc)
+                    val wv = g.shift?.veh                       // veículo da empresa (táxi, moto, caminhão) durante o turno
+                    val driving = dc != null || wv != null
+                    if (driving) {
+                        val maxV = wv?.maxV ?: carStreetSpeed(dc!!)
                         val busy = isBusy()
                         val go = dir != 0 && !busy
                         val tgt = if (go) dir * maxV else 0f
@@ -670,12 +675,14 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         if (vel != 0f) vel = 0f
                         engine.stop()
                         if (dir != 0 && !isBusy()) {
-                            px = (px + dir * (if (run) 135f else 75f) * (if (g.starving) 0.55f else 1f) * dt).coerceIn(20f, WORLD - 20f)
+                            px = (px + dir * (if (run) 135f else 75f) * (if (g.starving) 0.55f else 1f) * (if (g.tired) 0.8f else 1f) * dt).coerceIn(20f, WORLD - 20f)
                             face = dir
                         }
                     }
+                    // ---- trabalho: o turno anda no mundo (pausa enquanto alguma janela está aberta)
+                    g.shift?.let { sh -> if (!isBusy()) workFrame(g, sh, px, vel, dt) }
                     // ---- faixa do jogador: ultrapassa o trânsito mais lento pela faixa do meio (sem atravessar ninguém)
-                    if (dc != null) {
+                    if (driving) {
                         val lane = if (face < 0) 1 else 0
                         var targetG = if (lane == 0) 133f else 148f
                         if (abs(vel) > 40f) {
@@ -706,11 +713,11 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             val gg = d - (c.len + o.len) / 2f - 4f
                             if (gg < gap) { gap = gg; lv = o.v }
                         }
-                        if (dc != null && (if (face < 0) 1 else 0) == c.lane && abs(laneY - (if (c.lane == 0) 133f else 148f)) < 4f) {
+                        if (driving && (if (face < 0) 1 else 0) == c.lane && abs(laneY - (if (c.lane == 0) 133f else 148f)) < 4f) {
                             val pp = if (c.lane == 0) px else WORLD - px
                             var d = pp - pc
                             if (d < 0f) d += WORLD
-                            val gg = d - (c.len + vehLen(carSpriteFor(CATALOG[dc.model].body))) / 2f - 4f
+                            val gg = d - (c.len + vehLen(wv?.spr ?: carSpriteFor(CATALOG[dc!!.model].body))) / 2f - 4f
                             if (gg < gap) { gap = gg; lv = maxOf(0f, vel * (if (c.lane == 0) 1f else -1f)) }
                         }
                         val tgt = if (gap > 34f) c.v0 else if (gap <= 0f) 0f else minOf(c.v0, lv + gap * 1.2f)
@@ -729,6 +736,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
 
     Column(Modifier.fillMaxSize()) {
         NeedsBar(g)
+        WorkHud(g, px)
         Canvas(Modifier.fillMaxWidth().weight(1f)) {
             val s = size.width / VIEW_W
             val oy = size.height - 150f * s
@@ -1050,18 +1058,27 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         drawChar(mc.look, (ox - 6f - cam) * s, (114f - 26f) * s, s, i % 2 == 1, 0f, t * 2f + i)
                     }
                 }
-                val dcar = g.garage.firstOrNull { it.id == driveId }
-                if (dcar == null) {
+                drawWork(g, spr, cam, s, t, paint)
+                val wveh = g.shift?.veh
+                val dcar = if (wveh != null) null else g.garage.firstOrNull { it.id == driveId }
+                if (dcar == null && wveh == null) {
                     drawChar(look, (px - 6f - cam) * s, (115f - 26f) * s, s, face < 0, if (moving) 1f else 0f,
                         t * (if (run) 16f else 10f))
                 }
                 // ORDEM DE PROFUNDIDADE: quem tem o chão mais embaixo (y maior) fica na frente.
                 // faixa de cima (y=133) -> jogador (se estiver no meio, y~140) -> faixa de baixo (y=148)
-                var playerDrawn = dcar == null
+                var playerDrawn = dcar == null && wveh == null
                 fun drawPlayerCar() {
-                    val dc = dcar ?: return
                     if (playerDrawn) return
                     playerDrawn = true
+                    if (wveh != null) {
+                        drawVehWorld(
+                            spr.veh, wveh.spr, Color(PAINTS[wveh.color.coerceIn(0, PAINTS.lastIndex)].second),
+                            emptyList(), WORK_FULL, px, laneY, cam, s, face < 0, t, look, odo, abs(vel),
+                        )
+                        return
+                    }
+                    val dc = dcar ?: return
                     drawVehWorld(
                         spr.veh, carSpriteFor(CATALOG[dc.model].body), Color(PAINTS[dc.color.coerceIn(0, PAINTS.lastIndex)].second),
                         dc.tuning, dc.cond, px, laneY, cam, s, face < 0, t, look, odo, abs(vel),
@@ -1115,7 +1132,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                             glow(lc, 7f * s, Color(0xFFFFF1C2).copy(alpha = 0.95f * night))
                         }
                     }
-                    fun carLamps(cxw: Float, by: Float, sgn: Float, si: Int) {
+                    fun carLamps(cxw: Float, by: Float, sgn: Float, si: Int, tint: Color = Color(0xFFFFF3B0)) {
                         val m = VMETA[si.coerceIn(0, V_COUNT - 1)]
                         val fp = Offset((cxw + sgn * (m.hl[0] - m.cx) - cam) * s, (by - (m.gy - m.hl[1])) * s)
                         val beam = Path().apply {
@@ -1124,7 +1141,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         }
                         drawPath(
                             beam,
-                            Brush.horizontalGradient(listOf(Color(0xFFFFF3B0).copy(alpha = 0.55f * night), Color(0xFFFFF3B0).copy(alpha = 0f)), fp.x, fp.x + sgn * 48f * s),
+                            Brush.horizontalGradient(listOf(tint.copy(alpha = 0.55f * night), tint.copy(alpha = 0f)), fp.x, fp.x + sgn * 48f * s),
                             blendMode = BlendMode.Plus,
                         )
                         glow(fp, 5f * s, Color(0xFFFFFFFF).copy(alpha = 0.95f * night))
@@ -1137,8 +1154,15 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         if (c.x < cam - 100f || c.x > cam + VIEW_W + 100f) continue
                         carLamps(c.x, if (c.lane == 0) 133f else 148f, if (c.lane == 0) 1f else -1f, c.spr)
                     }
-                    val nightCar = g.garage.firstOrNull { it.id == driveId }
-                    if (nightCar != null) carLamps(px, laneY, if (face < 0) -1f else 1f, carSpriteFor(CATALOG[nightCar.model].body))
+                    val nightWv = g.shift?.veh
+                    val nightCar = if (nightWv != null) null else g.garage.firstOrNull { it.id == driveId }
+                    if (nightWv != null) carLamps(px, laneY, if (face < 0) -1f else 1f, nightWv.spr)
+                    if (nightCar != null) {
+                        carLamps(
+                            px, laneY, if (face < 0) -1f else 1f, carSpriteFor(CATALOG[nightCar.model].body),
+                            if ("farol" in nightCar.tuning) Color(0xFF8FD3FF) else Color(0xFFFFF3B0),
+                        )
+                    }
                 }
             }
 
@@ -1202,10 +1226,10 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 } else if (nearPed >= 0) {
                     Button(onClick = { chatPed = nearPed }) { Text("Conversar com ${pedName(nearPed)}", fontSize = 13.sp) }
                 } else {
-                    Text(if (driveId != null) "${(abs(vel) * 0.5f).toInt()} km/h" else "Explore a cidade", fontSize = 12.sp)
+                    Text(if (driveId != null || g.shift?.veh != null) "${(abs(vel) * 0.5f).toInt()} km/h" else "Explore a cidade", fontSize = 12.sp)
                 }
                 Row {
-                    TextButton(onClick = { if (driveId != null) driveId = null else driveDlg = true }, contentPadding = PaddingValues(6.dp)) { Text(if (driveId != null) "Descer" else "Dirigir", fontSize = 12.sp) }
+                    TextButton(onClick = { if (driveId != null) driveId = null else driveDlg = true }, enabled = g.shift?.veh == null, contentPadding = PaddingValues(6.dp)) { Text(if (g.shift?.veh != null) "Em serviço" else if (driveId != null) "Descer" else "Dirigir", fontSize = 12.sp) }
                 }
                 Row {
                     TextButton(onClick = { garageListDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("Garagem", fontSize = 12.sp) }
@@ -1213,7 +1237,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     TextButton(onClick = { jobDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("Trabalhar", fontSize = 12.sp) }
                 }
                 Row {
-                    TextButton(onClick = { taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("Táxi", fontSize = 12.sp) }
+                    TextButton(onClick = { if (g.shift != null) g.message = "Você está em serviço: encerre o turno antes de pegar táxi." else taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("Táxi", fontSize = 12.sp) }
                     TextButton(onClick = { run = !run }, contentPadding = PaddingValues(6.dp)) { Text(if (run) "Correndo" else "Andando", fontSize = 12.sp) }
                     TextButton(onClick = onEdit, contentPadding = PaddingValues(6.dp)) { Text("Visual", fontSize = 12.sp) }
                 }
@@ -1422,7 +1446,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                     OutlinedButton(
                         onClick = { taxi = false; rideHome() },
                         Modifier.fillMaxWidth(),
-                    ) { Text((if (g.minutes >= SLEEP_FROM) "Casa (ir dormir) -" else "Minha casa -") + brl(fareH), fontSize = 13.sp) }
+                    ) { Text((if (canSleep(g.minutes)) "Casa (ir dormir) -" else "Minha casa -") + brl(fareH), fontSize = 13.sp) }
                     TextButton(onClick = { taxi = false }) { Text("Cancelar") }
                 }
             }

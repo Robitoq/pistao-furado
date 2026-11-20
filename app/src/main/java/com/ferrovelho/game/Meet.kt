@@ -57,7 +57,7 @@ val MEET_PRIZES = listOf(4000, 2000, 800)
 /** Quantos pontos de beleza cada tuning dá (o total é limitado a 45). */
 private val VISUAL_TUNE = mapOf(
     "rodas" to 9, "rebaixada" to 9, "neon" to 8, "adesivo" to 6, "aerofolio" to 7, "parachoque" to 7,
-    "pelicula" to 4, "couro" to 5, "turbo" to 3, "escape" to 3, "som" to 4,
+    "pelicula" to 4, "farol" to 5, "metalica" to 6, "couro" to 5, "turbo" to 3, "escape" to 3, "som" to 4,
 )
 
 private val MEET_NAMES = listOf(
