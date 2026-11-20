@@ -1,1 +1,1 @@
-Cidade: tileset CP_V1.1.0 (nyknck). Carros: 2D Pixel Cars (Digital Realms Studio). Confira as licencas dos pacotes.
+Todos os sprites (veículos, prédios, adereços) foram gerados proceduralmente por tools/gen/*.py. Sem assets de terceiros.
