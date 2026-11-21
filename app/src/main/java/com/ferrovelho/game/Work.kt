@@ -108,8 +108,10 @@ val WORK_DEST: List<Pair<String, Float>> = listOf(
     "Prédio Central" to 9200f,
     "Cobertura Skyline" to 10200f,
     "Mansão da Colina" to 11300f,
-    "Parque Central" to 12800f,
-    "Quiosque da Praia" to 14500f,
+    "Banco Pistão" to BANK_X,
+    "Moda Pistão" to ROUPA_X,
+    "Parque Central" to PARK_X,
+    "Quiosque da Praia" to BEACH_X,
 )
 
 /** Veículo da empresa que o personagem dirige durante o turno. */

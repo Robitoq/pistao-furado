@@ -22,14 +22,14 @@ import kotlin.math.min
 import kotlin.math.sin
 
 // =====================================================================================
-//  MAPA MAIOR: cidade (0–12000), parque (12000–13700) e praia (13700–15600)
+//  MAPA GRANDE: cidade (0–30000), parque (30000–31700) e praia (31700–33600)
 // =====================================================================================
 
-const val CITY_END = 12000f
-const val BEACH_START = 13700f
-const val WORLD_END = 15600f
-const val PARK_X = 12800f     // fonte do parque
-const val BEACH_X = 14500f    // quiosque da praia
+const val CITY_END = 30000f
+const val BEACH_START = CITY_END + 1700f
+const val WORLD_END = CITY_END + 3600f
+const val PARK_X = CITY_END + 800f     // fonte do parque
+const val BEACH_X = CITY_END + 2500f   // quiosque da praia
 
 private val FLOWERS = listOf(Color(0xFFEF5350), Color(0xFFFFEE58), Color(0xFFFFFFFF), Color(0xFFAB47BC))
 private val UMBRELLAS = listOf(Color(0xFFE53935), Color(0xFFFDD835), Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFEC407A))
@@ -63,9 +63,9 @@ fun DrawScope.drawZones(cam: Float, s: Float, t: Float, night: Float, skyFrac: F
             wr(Color(0xFF81C784), x, 104f - (14f + h), 53f, 14f + h, cam, s)
         }
         // lago com patinhos
-        drawOval(Color(0xFF4FC3F7), Offset((5380f - cam) * s, 94f * s), Size(220f * s, 11f * s))
-        drawOval(Color(0x55FFFFFF), Offset((5400f - cam) * s, 96f * s), Size(60f * s, 2f * s))
-        val dx = 5460f + sin(t * 0.5f) * 40f
+        drawOval(Color(0xFF4FC3F7), Offset(((CITY_END + 380f) - cam) * s, 94f * s), Size(220f * s, 11f * s))
+        drawOval(Color(0x55FFFFFF), Offset(((CITY_END + 400f) - cam) * s, 96f * s), Size(60f * s, 2f * s))
+        val dx = CITY_END + 460f + sin(t * 0.5f) * 40f
         wr(Color(0xFFFFFFFF), dx, 97f, 6f, 3f, cam, s)
         wr(Color(0xFFFFB300), dx + (if (cos2(t * 0.5f) > 0f) 6f else -2f), 97.6f, 2f, 1f, cam, s)
         wr(Color(0xFFFFFFFF), dx + 40f, 99f, 6f, 3f, cam, s)
@@ -97,7 +97,7 @@ fun DrawScope.drawZones(cam: Float, s: Float, t: Float, night: Float, skyFrac: F
             wr(Color(0xFF37474F), x + 18.5f, 108f, 1.5f, 3f, cam, s)
         }
         // portal do parque
-        val gx = 5040f
+        val gx = CITY_END + 40f
         wr(Color(0xFF6D4C41), gx - 26f, 70f, 5f, 38f, cam, s)
         wr(Color(0xFF6D4C41), gx + 21f, 70f, 5f, 38f, cam, s)
         wr(Color(0xFF2E7D32), gx - 28f, 62f, 56f, 14f, cam, s)
@@ -139,9 +139,9 @@ fun DrawScope.drawZones(cam: Float, s: Float, t: Float, night: Float, skyFrac: F
             wr(Color(0x59FFFFFF), x, 54f + (hsh(k * 7 + 1) % 36), 14f, 0.9f, cam, s)
         }
         // ilha ao longe e veleiro
-        wr(Color(0xFF5E8F6B), 7150f, 44f, 90f, 6f, cam, s)
-        wr(Color(0xFF6FA27B), 7168f, 40f, 50f, 5f, cam, s)
-        val bx = 7900f + sin(t * 0.15f) * 50f
+        wr(Color(0xFF5E8F6B), CITY_END + 2150f, 44f, 90f, 6f, cam, s)
+        wr(Color(0xFF6FA27B), CITY_END + 2168f, 40f, 50f, 5f, cam, s)
+        val bx = CITY_END + 2900f + sin(t * 0.15f) * 50f
         wr(Color(0xFF6D4C41), bx, 70f, 22f, 4f, cam, s)
         wr(Color(0xFF4E342E), bx + 10f, 54f, 1f, 16f, cam, s)
         wr(Color(0xFFFFFFFF), bx + 11.5f, 55f, 8f, 12f, cam, s)
