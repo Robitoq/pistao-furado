@@ -109,6 +109,8 @@ val WORK_DEST: List<Pair<String, Float>> = listOf(
     "Cobertura Skyline" to 10200f,
     "Mansão da Colina" to 11300f,
     "Banco Pistão" to BANK_X,
+    "Venda da Dona Cida" to VENDA_X,
+    "Bar do Zé" to BAR_X,
     "Moda Pistão" to ROUPA_X,
     "Parque Central" to PARK_X,
     "Quiosque da Praia" to BEACH_X,

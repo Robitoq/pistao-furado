@@ -28,6 +28,7 @@ import kotlin.math.sin
 const val CITY_END = 30000f
 const val BEACH_START = CITY_END + 1700f
 const val WORLD_END = CITY_END + 3600f
+const val WORLD_START = -9000f   // vila rural à esquerda da casa (x negativo)
 const val PARK_X = CITY_END + 800f     // fonte do parque
 const val BEACH_X = CITY_END + 2500f   // quiosque da praia
 
