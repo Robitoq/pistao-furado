@@ -620,6 +620,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     var bankDlg by remember { mutableStateOf(false) }
     var roupaDlg by remember { mutableStateOf(false) }
     var lotDlg by remember { mutableStateOf<Int?>(null) }
+    var loveDlg by remember { mutableStateOf(false) }
+    var tripDlg by remember { mutableStateOf<Trip?>(null) }
     var lots by remember { mutableStateOf(loadLots(prefs, lotNow(g))) }
     var driveDlg by remember { mutableStateOf(false) }
     var dragDlg by remember { mutableStateOf(false) }
@@ -653,7 +655,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     }
 
     // true enquanto alguma janela/cena está aberta (o personagem não anda)
-    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || jobDlg || propDlg != null || clubInside || propInside != null || bizDlg != null || shopDlg != null || chatPed != null || bankDlg || roupaDlg || lotDlg != null
+    fun isBusy() = talk != null || taxi || meetDlg || homeDlg || sleeping || lateAsk || garageDlg || zoneDlg != null || lojaDlg != null || driveDlg || dragDlg || garageListDlg || summaryDlg || jobDlg || propDlg != null || clubInside || propInside != null || bizDlg != null || shopDlg != null || chatPed != null || bankDlg || roupaDlg || lotDlg != null || loveDlg || tripDlg != null
 
     /** Táxi pra casa: se for de noite, já vai dormir. Sem dinheiro, o motorista leva mesmo assim. */
     fun rideHome() {
@@ -1327,6 +1329,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 Row {
                     TextButton(onClick = { if (g.shift != null) g.message = "Você está em serviço: encerre o turno antes de pegar táxi." else taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("Táxi", fontSize = 12.sp) }
                     TextButton(onClick = { run = !run }, contentPadding = PaddingValues(6.dp)) { Text(if (run) "Correndo" else "Andando", fontSize = 12.sp) }
+                    TextButton(onClick = { loveDlg = true }, contentPadding = PaddingValues(6.dp)) { Text("❤ Amor", fontSize = 12.sp) }
                 }
             }
             RoundHold(1, { dir = if (it) 1 else 0 })
@@ -1348,6 +1351,8 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
     bizDlg?.let { bi -> if (bi == 0 && 0 in g.companies) InteriorDialog(g, Room.SHOP) { bizDlg = null } else CompanyDialog(g, bi) { bizDlg = null } }
     shopDlg?.let { si -> InteriorDialog(g, Room.STORE, storeIdx = si) { shopDlg = null } }
     if (bankDlg) BankDialog(g, prefs) { bankDlg = false }
+    if (loveDlg) RelationshipDialog(g, prefs, me, onGo = { trip -> loveDlg = false; tripDlg = trip }) { loveDlg = false }
+    tripDlg?.let { tr -> InteriorDialog(g, tr.room, storeIdx = tr.storeIdx, companions = tr.companions) { tripDlg = null } }
     if (roupaDlg) ClothesDialog(g, me, onBuy = onLook) { roupaDlg = false }
     lotDlg?.let { li -> LotDialog(g, li, lots, prefs, onLots = { lots = it }) { lotDlg = null } }
     if (clubInside) InteriorDialog(g, Room.CLUB) { clubInside = false }

@@ -59,6 +59,7 @@ fun FriendChat(g: GameState, name: String, level: Int, me: String, onLevel: (Int
                     val n = min(5, level + 2); onLevel(n); say("Valeu pelo refri, $me! Você é gente boa.")
                     g.message = if (n >= FRIEND_LVL && !friend) "Vocês agora são amigos!" else "Você pagou um refri"
                 }, Modifier.fillMaxWidth(), enabled = g.money >= 10) { Text("Pagar um refri · ${brl(10)}") }
+                if (friend) Text("Dica: no botão ❤ Amor da cidade você pode chamar essa pessoa pra passear.", fontSize = 11.sp)
                 if (friend) OutlinedButton(onClick = { say(TIPS.random()); g.message = "" }, Modifier.fillMaxWidth()) { Text("Pedir uma dica de negócio") }
                 TextButton(onClick = onClose) { Text("Tchau") }
             }

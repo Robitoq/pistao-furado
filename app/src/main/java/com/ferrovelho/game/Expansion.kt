@@ -342,7 +342,7 @@ fun DrawScope.drawRoupaLit(open: Boolean, cam: Float, s: Float, night: Float) {
 // -------------------------------------------------------------------------------------
 
 @Composable
-private fun FullDialog(title: String, g: GameState, onClose: () -> Unit, body: @Composable ColumnScope.() -> Unit) {
+fun FullDialog(title: String, g: GameState, onClose: () -> Unit, body: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize()) {
             Column(
