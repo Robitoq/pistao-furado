@@ -75,17 +75,18 @@ jobs:
       - name: Arrumar arquivos novos que subiram no lugar errado
         run: |
           G=app/src/main/java/com/ferrovelho/game
+          if [ ! -f ferrovelho.jks ] && [ -f "ferrovelho (2).jks" ]; then cp "ferrovelho (2).jks" ferrovelho.jks; fi
           # apaga restos com .txt
           rm -f $G/*.kt.txt $G/build.gradle.kts.txt app/build.gradle.kts.txt
           # se o arquivo novo estiver solto na raiz, move pro lugar certo
           fix() {
-            if [ -f "$1" ] && grep -qF "$3" "$1" && ! grep -qF "$3" "$2" 2>/dev/null; then
+            if [ -f "$1" ] && grep -qF "$3" "$1" && { [ -z "$4" ] || grep -qF "$4" "$1"; } && ! grep -qF "$3" "$2" 2>/dev/null; then
               mkdir -p "$(dirname "$2")"
               cp "$1" "$2"
               echo "Arrumado: $1 -> $2"
             fi
           }
-          fix City.kt          $G/City.kt          'VIEW_W - 4f'
+          fix City.kt          $G/City.kt          'VIEW_W - 4f' 'PACK_MOTOS'
           fix Interior.kt      $G/Interior.kt      'val gb = false'
           fix Dialog.kt        $G/Dialog.kt        'shade(look.hair'
           fix MainActivity.kt  $G/MainActivity.kt  'sem tela de erro'
@@ -171,6 +172,13 @@ jobs:
               id("org.jetbrains.kotlin.plugin.compose") version "2.0.20" apply false
           }
           EOT
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Gerar sprites dos packs (veiculos brasileiros, luxo e tunagem)
+        run: |
+          pip install numpy scipy opencv-python-headless pillow
+          sh tools/gen/build_packs.sh
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
