@@ -615,7 +615,7 @@ fun DrawScope.drawVeh(
                 drawRect(Color(0xFF263238), Offset(seatX + 4f, topY + 6f), Size(2f, 4f))                    // canela
                 drawRect(shirt, Offset(seatX - 1f, topY - 4f), Size(4f, 7f))                                // tronco
                 drawRect(shirt, Offset(seatX + 2f, topY - 3f), Size((m.front - seatX - 14).coerceAtLeast(4).toFloat(), 2f)) // braço
-                drawRect(skin, Offset(seatX, topY - 7f), Size(3f, 3f))                                      // cabeça
+                drawRect(skin, Offset(seatX.toFloat(), topY - 7f), Size(3f, 3f))                                      // cabeça
                 drawRect(helmet, Offset(seatX - 1f, topY - 8f), Size(4f, 2f))                               // capacete
             }
 

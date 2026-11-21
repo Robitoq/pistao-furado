@@ -271,14 +271,19 @@ fun DrawScope.drawChar(l: Look, left: Float, top: Float, c: Float, faceLeft: Boo
     if (bot == 2) r(botC, 2.6f, 16.5f, 6.8f, 4f)
     // braços
     val sleeve = when (l.topType) { 0 -> 3f; 1 -> 0f; else -> 7f }
-    for ((ax, off) in listOf(1.2f to sw * 1.6f, 9f to -sw * 1.6f)) {
-        r(skin, ax, 9.3f + off, 1.8f, 7.5f)
-        if (sleeve > 0f) r(topC, ax, 9.3f + off, 1.8f, sleeve)
+    val aw = if (l.female) 1.5f else 1.8f
+    for ((ax0, off) in listOf(1.2f to sw * 1.6f, 9f to -sw * 1.6f)) {
+        val ax = if (l.female) ax0 + (if (ax0 < 5f) 0.4f else -0.1f) else ax0
+        r(skin, ax, 9.3f + off, aw, 7.5f)
+        if (sleeve > 0f) r(topC, ax, 9.3f + off, aw, sleeve)
     }
     // tronco
-    val tx = if (l.female) 3.3f else 3f
-    val tw = if (l.female) 5.4f else 6f
-    r(topC, tx, 9f, tw, 8f)
+    val tx = if (l.female) 3.7f else 3f
+    val tw = if (l.female) 4.6f else 6f
+    if (l.female) {
+        r(topC, 3.2f, 9f, 5.6f, 4.2f)      // busto/ombros
+        r(topC, tx, 13.2f, tw, 3.8f)       // cintura fina
+    } else r(topC, tx, 9f, tw, 8f)
     if (l.topType == 2) { r(Color(0x55000000), 5.8f, 9f, 0.4f, 8f); r(Color(0x33FFFFFF), tx, 9f, tw, 1.2f) }
     if (bot != 2) r(Color(0xFF212121), tx, 16.3f, tw, 0.8f)
     r(skin, 5f, 8f, 2f, 1.3f)
@@ -286,7 +291,17 @@ fun DrawScope.drawChar(l: Look, left: Float, top: Float, c: Float, faceLeft: Boo
     r(skin, 3f, 2f, 6f, 6.2f)
     r(Color(0xFF212121), 4.5f, 4.7f, 1.1f, 1.4f)
     r(Color(0xFF212121), 6.9f, 4.7f, 1.1f, 1.4f)
-    r(if (l.female) Color(0xFFC2185B) else Color(0xFF8D4B3B), 5.6f, 6.7f, 1.8f, 0.5f)
+    if (l.female) {
+        val dk = Color(0xFF212121)
+        r(dk, 4.2f, 4.3f, 1.7f, 0.45f); r(dk, 6.6f, 4.3f, 1.7f, 0.45f)   // cílios
+        r(dk, 3.9f, 4.6f, 0.4f, 0.5f); r(dk, 8.3f, 4.6f, 0.4f, 0.5f)
+        r(hairC, 4.3f, 3.7f, 1.6f, 0.35f); r(hairC, 6.6f, 3.7f, 1.6f, 0.35f) // sobrancelha fina
+        r(Color(0x66FF6F91), 3.5f, 5.9f, 1.3f, 0.9f); r(Color(0x66FF6F91), 7.2f, 5.9f, 1.3f, 0.9f) // blush
+        r(Color(0xFFD81B60), 5.3f, 6.6f, 2.4f, 0.8f)                      // batom
+        r(Color(0xFFFFD54F), 2.7f, 5.8f, 0.6f, 1f); r(Color(0xFFFFD54F), 8.7f, 5.8f, 0.6f, 1f) // brincos
+    } else {
+        r(Color(0xFF8D4B3B), 5.6f, 6.7f, 1.8f, 0.5f)
+    }
     when (l.hairStyle) {
         0, 4 -> { r(hairC, 2.6f, 0.8f, 6.8f, 2.4f); r(hairC, 2.6f, 2.6f, 1f, 2.2f); r(hairC, 8.4f, 2.6f, 1f, 2.2f) }
         1 -> r(hairC, 2.6f, 0.8f, 6.8f, 2.6f)
@@ -331,17 +346,41 @@ private val PED_LINES = listOf(
 )
 
 private fun DrawScope.bubble(p: Paint, txt: String, wx: Float, bottomY: Float, cam: Float, s: Float) {
-    p.textSize = 5.2f * s
-    val tw = p.measureText(txt) / s
-    val bw = tw + 6f
-    // o balão não sai da tela; o biquinho continua apontando pra quem fala
-    val cxw = wx.coerceIn(cam + bw / 2f + 1.5f, cam + VIEW_W - bw / 2f - 1.5f)
-    val x = cxw - bw / 2f
-    val tail = wx.coerceIn(x + 3f, x + bw - 3f)
-    wr(Color(0xFF212121), x - 0.6f, bottomY - 10.6f, bw + 1.2f, 10.2f, cam, s)
-    wr(Color(0xFFFFFFFF), x, bottomY - 10f, bw, 9f, cam, s)
-    wr(Color(0xFFFFFFFF), tail - 1.5f, bottomY - 1f, 3f, 2f, cam, s)
-    label(p, txt, cxw, bottomY - 3.4f, cam, s, 5.2f, 0xFF212121.toInt())
+    try {
+        p.textSize = 5.2f * s
+        // largura máxima do balão: nunca maior que a tela (senão o coerceIn quebra e o jogo fecha)
+        val maxTw = VIEW_W - 16f
+        val words = txt.split(' ').filter { it.isNotEmpty() }
+        val lines = ArrayList<String>()
+        var curLine = ""
+        for (w in words) {
+            val test = if (curLine.isEmpty()) w else "$curLine $w"
+            if (curLine.isNotEmpty() && p.measureText(test) / s > maxTw) { lines.add(curLine); curLine = w }
+            else curLine = test
+        }
+        if (curLine.isNotEmpty()) lines.add(curLine)
+        if (lines.isEmpty()) return
+        if (lines.size > 3) { while (lines.size > 3) lines.removeAt(lines.lastIndex) }
+        var tw = 0f
+        for (l in lines) tw = max(tw, p.measureText(l) / s)
+        val bw = (tw + 6f).coerceAtMost(VIEW_W - 4f)
+        val lh = 6.4f
+        val bh = 3f + lh * lines.size
+        // o balão não sai da tela; o biquinho continua apontando pra quem fala
+        val lo = cam + bw / 2f + 1.5f
+        val hi = max(lo, cam + VIEW_W - bw / 2f - 1.5f)
+        val cxw = wx.coerceIn(lo, hi)
+        val x = cxw - bw / 2f
+        val tail = wx.coerceIn(x + 3f, max(x + 3f, x + bw - 3f))
+        wr(Color(0xFF212121), x - 0.6f, bottomY - bh - 1.6f, bw + 1.2f, bh + 1.2f, cam, s)
+        wr(Color(0xFFFFFFFF), x, bottomY - bh - 1f, bw, bh, cam, s)
+        wr(Color(0xFFFFFFFF), tail - 1.5f, bottomY - 1f, 3f, 2f, cam, s)
+        for ((i, l) in lines.withIndex()) {
+            label(p, l, cxw, bottomY - bh + 3.4f + lh * i, cam, s, 5.2f, 0xFF212121.toInt())
+        }
+    } catch (_: Throwable) {
+        // balão é só enfeite: se der qualquer problema, não desenha e o jogo continua
+    }
 }
 
 fun DrawScope.glow(center: Offset, radius: Float, c: Color) {
@@ -1255,7 +1294,6 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                 Row {
                     TextButton(onClick = { if (g.shift != null) g.message = "Você está em serviço: encerre o turno antes de pegar táxi." else taxi = true }, contentPadding = PaddingValues(6.dp)) { Text("Táxi", fontSize = 12.sp) }
                     TextButton(onClick = { run = !run }, contentPadding = PaddingValues(6.dp)) { Text(if (run) "Correndo" else "Andando", fontSize = 12.sp) }
-                    TextButton(onClick = onEdit, contentPadding = PaddingValues(6.dp)) { Text("Visual", fontSize = 12.sp) }
                 }
             }
             RoundHold(1, { dir = if (it) 1 else 0 })
@@ -1524,8 +1562,12 @@ private fun CharacterCreator(onDone: (PlayerProfile) -> Unit) {
         FilterChip(walking, { walking = !walking }, { Text(if (walking) "Andando" else "Parado") })
         OutlinedTextField(name, { name = it.take(14) }, label = { Text("Nome") }, singleLine = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(!female, { female = false }, { Text("Homem") })
-            FilterChip(female, { female = true }, { Text("Mulher") })
+            FilterChip(!female, {
+                if (female) { female = false; hairStyle = 0; botType = 0; top = 0 }
+            }, { Text("Homem") })
+            FilterChip(female, {
+                if (!female) { female = true; hairStyle = 1; botType = 2; top = 9 }
+            }, { Text("Mulher") })
         }
         Chooser("Cabelo", HAIR_STYLES, hairStyle) { hairStyle = it }
         Swatches("Cor do cabelo", CHAIR, hair) { hair = it }
