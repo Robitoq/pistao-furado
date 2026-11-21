@@ -12,13 +12,25 @@ android {
         applicationId = "com.ferrovelho.game"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+        versionName = "0.2"
+    }
+
+    // Chave fixa: todo APK novo usa a mesma assinatura e atualiza por cima do instalado.
+    signingConfigs {
+        create("fixa") {
+            storeFile = file("../ferrovelho.jks")
+            storePassword = "ferrovelho123"
+            keyAlias = "ferrovelho"
+            keyPassword = "ferrovelho123"
+        }
     }
 
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("fixa") }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("fixa")
         }
     }
 
