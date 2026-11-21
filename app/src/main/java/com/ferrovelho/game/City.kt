@@ -123,6 +123,22 @@ class CitySprites(
     }
 }
 
+/** motos dos packs (sprites sem piloto: o piloto é desenhado em drawVeh) */
+val PACK_MOTOS = intArrayOf(PK_MOTO_CG, PK_MOTO_TITAN, PK_MOTO_FAN, PK_MOTO_BIZ, PK_MOTO_ENTREGA)
+
+/** Carros civis do trânsito: os 21 genéricos + os do pack de brasileiros; os de luxo aparecem raramente (~1 em 8). */
+private val CIVIL_BR: IntArray by lazy {
+    IntArray(P_COUNT) { P_BASE + it }
+        .filter { PACK_KIND[it - P_BASE] !in listOf("moto", "bus", "truck") && !PMETA[it - P_BASE].name.startsWith("l_") }
+        .toIntArray()
+}
+private val CIVIL_LUX: IntArray by lazy { IntArray(P_COUNT) { P_BASE + it }.filter { PMETA[it - P_BASE].name.startsWith("l_") }.toIntArray() }
+fun randomCivil(r: Random): Int = when {
+    r.nextInt(8) == 0 -> CIVIL_LUX[r.nextInt(CIVIL_LUX.size)]
+    r.nextBoolean() -> CIVIL_BR[r.nextInt(CIVIL_BR.size)]
+    else -> r.nextInt(V_GARAGE)
+}
+
 /** carroceria do catálogo -> sprite de veículo (ver Vehicles.kt) */
 fun carSpriteFor(b: Body): Int = vehicleFor(b)
 
@@ -499,21 +515,21 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
             val roll = r.nextInt(100)
             val sp = when {
                 roll < 9 -> V_TAXI
-                roll < 17 -> if (r.nextBoolean()) V_MOTO else V_MOTO_ENTREGA
-                roll < 23 -> if (r.nextBoolean()) V_TRUCK_BAU else V_TRUCK_MADEIRA
-                roll < 28 -> V_BUS
-                else -> r.nextInt(V_GARAGE)
+                roll < 17 -> PACK_MOTOS.let { mt -> if (r.nextInt(3) == 0) (if (r.nextBoolean()) V_MOTO else V_MOTO_ENTREGA) else mt[r.nextInt(mt.size)] }
+                roll < 23 -> when (r.nextInt(3)) { 0 -> V_TRUCK_BAU; 1 -> V_TRUCK_MADEIRA; else -> PK_MB1113 }
+                roll < 28 -> if (r.nextInt(3) == 0) V_BUS else if (r.nextBoolean()) PK_ONIBUS else PK_ESCOLAR
+                else -> randomCivil(r)
             }
             val v0 = when (sp) {
-                V_BUS -> 24f + r.nextInt(8)
-                V_TRUCK_BAU, V_TRUCK_MADEIRA -> 22f + r.nextInt(8)
-                V_MOTO, V_MOTO_ENTREGA -> 38f + r.nextInt(18)
+                V_BUS, PK_ONIBUS, PK_ESCOLAR -> 24f + r.nextInt(8)
+                V_TRUCK_BAU, V_TRUCK_MADEIRA, PK_MB1113 -> 22f + r.nextInt(8)
+                V_MOTO, V_MOTO_ENTREGA, PK_MOTO_CG, PK_MOTO_TITAN, PK_MOTO_FAN, PK_MOTO_BIZ, PK_MOTO_ENTREGA -> 38f + r.nextInt(18)
                 else -> 26f + r.nextInt(24)
             }
             val col = when (sp) {
                 V_TAXI -> 7
-                V_BUS -> intArrayOf(5, 6, 0, 4)[r.nextInt(4)]
-                V_TRUCK_BAU, V_TRUCK_MADEIRA -> intArrayOf(0, 5, 4, 6, 2)[r.nextInt(5)]
+                V_BUS, PK_ONIBUS, PK_ESCOLAR -> intArrayOf(5, 6, 0, 4)[r.nextInt(4)]
+                V_TRUCK_BAU, V_TRUCK_MADEIRA, PK_MB1113 -> intArrayOf(0, 5, 4, 6, 2)[r.nextInt(5)]
                 else -> r.nextInt(PAINTS.size)
             }
             val lat = intArrayOf(100, 100, 100, 85, 60, 35)[r.nextInt(6)]
@@ -1133,7 +1149,7 @@ private fun CityWorld(g: GameState, me: PlayerProfile, spr: CitySprites, prefs: 
                         }
                     }
                     fun carLamps(cxw: Float, by: Float, sgn: Float, si: Int, tint: Color = Color(0xFFFFF3B0)) {
-                        val m = VMETA[si.coerceIn(0, V_COUNT - 1)]
+                        val m = vmeta(si.coerceIn(0, V_TOTAL - 1))
                         val fp = Offset((cxw + sgn * (m.hl[0] - m.cx) - cam) * s, (by - (m.gy - m.hl[1])) * s)
                         val beam = Path().apply {
                             moveTo(fp.x, fp.y - 1.2f * s); lineTo(fp.x + sgn * 48f * s, fp.y - 8f * s)

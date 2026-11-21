@@ -35,6 +35,7 @@ lines = ['package com.ferrovelho.game', '', '// GERADO por tools/gen/build_asset
  '    val head: IntArray, val glass: IntArray, val door: IntArray, val wing: IntArray, val exhaust: IntArray,',
  '    val front: Int, val rear: Int, val hl: IntArray, val tl: IntArray, val headRect: IntArray, val tailRect: IntArray,',
  '    val hoodY: Int, val cab: Boolean,',
+ '    val pack: Boolean = false,   // true = sprite dos packs (ver PackData.kt / Vehicles.kt)',
  ')', '', 'const val V_TAXI = 21', 'const val V_MOTO = 22', 'const val V_MOTO_ENTREGA = 23', 'const val V_TRUCK_BAU = 24',
  'const val V_TRUCK_MADEIRA = 25', 'const val V_BUS = 26', 'const val V_COUNT = 27', 'const val V_GARAGE = 21', '',
  'val VMETA: List<VMeta> = listOf(']

@@ -35,3 +35,19 @@ m("Marca", "Modelo", valorEmReais, Corpo, Categoria, anoInicial, anoFinal),
 ```
 
 Os valores e anos do catálogo são aproximados, feitos só para o jogo.
+
+## Packs de veículos (brasileiros + luxo + tunagem)
+
+Os três posters (`tools/gen/packs_src/`) viraram sprites individuais e estão integrados ao jogo:
+
+- **72 veículos novos** (`assets/packs/pb<N>.png` carroceria, `pi<N>.png` interior, `pw<N>.png` rodas originais): 40 brasileiros, 5 motos
+  (com piloto), 2 ônibus, 1 caminhão, 1 van e 24 carros de luxo. Aparecem no catálogo (ver `Cars.kt`, `PACK_SHAPE` e os modelos novos no
+  fim de `CATALOG`) e no trânsito da cidade.
+- **Cor**: a lataria é recolorida por pixel (qualquer das 33 tintas, 19 delas vindas do pack de tunagem), com o desgaste/ferrugem do jogo.
+- **Tuning visível em TODOS os carros**: rodas esportivas (6 desenhos do pack, giram), aerofólio (6 desenhos, 3 tamanhos),
+  escapamento/ponteira, adesivos (6 desenhos, só em cima da lataria), faróis, insulfilm (vidro escuro), suspensão rebaixada (carro desce +
+  mola colorida do coilover aparece), neon (5 cores), para-choque, couro, som, turbo.
+- Recortes individuais de cada peça (30 rodas, 12 aerofólios, 12 para-choques, 7 coilovers, 8 escapes, 12 adesivos, 12 faróis, bancos,
+  volantes, som, extras, emblemas, efeitos...) estão em `tools/gen/packs_out/tun/`; os veículos em alta resolução, em `packs_out/cut/`.
+- Para regenerar tudo: `sh tools/gen/build_packs.sh` (precisa de python3 + numpy, scipy, opencv-python, pillow).
+  Teste de consistência: `python3 tools/gen/packs_selftest.py`. Pré-visualização: `tools/gen/packs_preview.py`.

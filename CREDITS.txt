@@ -1,1 +1,3 @@
 Veículos, prédios, árvores e adereços: gerados proceduralmente por tools/gen (autoral, sem assets de terceiros).
+
+Packs de veículos brasileiros, carros de luxo e tunagem (pixel art): posters em tools/gen/packs_src, recortados por tools/gen/packs_*.py.

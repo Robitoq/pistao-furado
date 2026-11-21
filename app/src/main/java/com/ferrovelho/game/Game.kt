@@ -41,7 +41,7 @@ val PAINTS: List<Pair<String, Long>> = listOf(
     "Bege" to 0xFFD7B98E,
     "Vinho" to 0xFF6D1B2A,
     "Azul bebê" to 0xFF4FC3F7,
-)
+) + PAINTS_PACK   // + tintas do pack de tunagem (PackData.kt); as 14 primeiras mantêm os índices dos jogos salvos
 
 /**
  * Peça de tuning.

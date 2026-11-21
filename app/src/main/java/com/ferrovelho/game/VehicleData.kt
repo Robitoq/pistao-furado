@@ -8,6 +8,7 @@ class VMeta(
     val head: IntArray, val glass: IntArray, val door: IntArray, val wing: IntArray, val exhaust: IntArray,
     val front: Int, val rear: Int, val hl: IntArray, val tl: IntArray, val headRect: IntArray, val tailRect: IntArray,
     val hoodY: Int, val cab: Boolean,
+    val pack: Boolean = false,   // true = sprite dos packs (ver PackData.kt / Vehicles.kt)
 )
 
 const val V_TAXI = 21
