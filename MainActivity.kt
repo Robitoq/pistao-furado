@@ -30,17 +30,42 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Music.init(applicationContext)
         Voice.init(applicationContext)
-        // se o app fechar por erro, limpa qualquer log antigo e abre o jogo normalmente (sem tela de erro)
-        try { getSharedPreferences("crash", Context.MODE_PRIVATE).edit().clear().apply() } catch (_: Throwable) {}
+        val crashPrefs = getSharedPreferences("crash", Context.MODE_PRIVATE)
         val prev = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
-            try { Log.e("PistaoFurado", "Erro fatal", e) } catch (_: Throwable) {}
-            try { game?.save() } catch (_: Throwable) {}
+            try { crashPrefs.edit().putString("log", Log.getStackTraceString(e).take(4000)).commit() } catch (_: Throwable) {}
             prev?.uncaughtException(t, e)
+        }
+        val lastCrash = crashPrefs.getString("log", null)
+        if (lastCrash != null) {
+            // mostra o erro da última vez que o app fechou, em vez de abrir o jogo
+            setContent {
+                GameTheme {
+                    Surface(Modifier.fillMaxSize()) {
+                        val clip = LocalClipboardManager.current
+                        var show by remember { mutableStateOf(true) }
+                        if (show) {
+                            Column(Modifier.fillMaxSize().statusBarsPadding().padding(12.dp).verticalScroll(rememberScrollState())) {
+                                Text("O jogo fechou por um erro. Tire print desta tela e mande pro suporte:", fontSize = 14.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Text(lastCrash, fontSize = 10.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Button(onClick = { clip.setText(AnnotatedString(lastCrash)) }) { Text("Copiar erro") }
+                                Button(onClick = {
+                                    crashPrefs.edit().remove("log").commit()
+                                    show = false
+                                    recreate()
+                                }) { Text("Apagar erro e tentar abrir") }
+                            }
+                        }
+                    }
+                }
+            }
+            return
         }
         val g = GameState(applicationContext)
         game = g
-        try { g.load() } catch (e: Throwable) { Log.e("PistaoFurado", "Falha ao carregar save", e) }
+        g.load()
         setContent {
             GameTheme {
                 Surface(Modifier.fillMaxSize()) {

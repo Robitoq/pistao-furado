@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -56,6 +57,10 @@ private class Npc(
     var wander = false
     var friend = false
     var dance = false
+    var follow = false   // acompanhante: segue o jogador
+    var comp = false
+    var kid = false      // filho (fica em casa)
+    var scale = 1f
 }
 
 // paleta Game Boy: escuro -> claro, aplicada em cima da cena inteira
@@ -106,7 +111,7 @@ private fun commentFor(g: GameState, c: OwnedCar, rnd: Random): String {
 }
 
 @Composable
-fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx: Int = 0, title: String? = null, onClose: () -> Unit) {
+fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx: Int = 0, title: String? = null, companions: List<String> = emptyList(), onCloseRaw: () -> Unit) {
     val ctx = LocalContext.current
     val vset = remember { CitySprites.get(ctx).veh }
     val prefs = remember { ctx.getSharedPreferences("city", android.content.Context.MODE_PRIVATE) }
@@ -132,6 +137,18 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
     var selCar by remember { mutableStateOf<OwnedCar?>(null) }
     var panel by remember { mutableStateOf(false) }
     var homeSub by remember { mutableStateOf(false) }
+    val startAbs = remember { g.day * 1440 + g.minutes }
+    var shared by remember { mutableIntStateOf(0) }
+    var actSpent by remember { mutableIntStateOf(0) }
+    var outingClosed by remember { mutableStateOf(false) }
+    val partnerName = remember { loadRomance(prefs).partner }
+    val onClose: () -> Unit = {
+        if (!outingClosed) {
+            outingClosed = true
+            if (companions.isNotEmpty()) outingDone(g, prefs, companions, (g.day * 1440 + g.minutes) - startAbs, shared)
+            onCloseRaw()
+        }
+    }
 
     // carros mostrados
     val cars: List<OwnedCar> = when (room) {
@@ -167,7 +184,7 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
             val fr = friends.filter { it.value >= FRIEND_LVL }.keys.shuffled(rr).take(2)
             val others = NPC_NAMES.filter { it !in friends.keys }.shuffled(rr).take(if (room == Room.STORE) 2 else 4)
             (fr + others).forEach { nm ->
-                val n = Npc(randomLook(Random(nm.hashCode())), 2f + rr.nextFloat() * 12f, area + rr.nextFloat() * (11.5f - area))
+                val n = Npc(npcLookFor(nm), 2f + rr.nextFloat() * 12f, area + rr.nextFloat() * (11.5f - area))
                 n.name = nm; n.wander = true; n.friend = nm in fr; n.tx = n.x; n.ty = n.y; n.state = 1; n.timer = rr.nextFloat() * 3f
                 npcs.add(n)
             }
@@ -178,7 +195,7 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
                 val b = Npc(randomLook(Random(900 + i + g.day)), x, 3.9f); b.dance = true; b.state = 1; b.timer = 1e9f; npcs.add(b)
             }
             NPC_NAMES.shuffled(rr).take(9).forEach { nm ->
-                val n = Npc(randomLook(Random(nm.hashCode())), 1.5f + rr.nextFloat() * 13f, 7.4f + rr.nextFloat() * 4f)
+                val n = Npc(npcLookFor(nm), 1.5f + rr.nextFloat() * 13f, 7.4f + rr.nextFloat() * 4f)
                 n.name = nm; n.wander = true; n.dance = true; n.friend = (friends[nm] ?: 0) >= FRIEND_LVL; n.tx = n.x; n.ty = n.y; n.state = 1; n.timer = rr.nextFloat() * 2f
                 npcs.add(n)
             }
@@ -190,6 +207,24 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
         if (room == Room.WORKSHOP) {
             val m = Npc(randomLook(Random(77)), 12f, 9f, mechanic = true)
             m.slot = 0; m.tx = slotX(0) + 1.3f; m.ty = slotY(0) + 0.9f; npcs.add(m)
+        }
+        val rmNow = loadRomance(prefs)
+        companions.forEachIndexed { i, nm ->
+            val n = Npc(npcLookFor(nm), DOOR_X + i * 0.8f, 11.7f)
+            n.name = nm; n.friend = true; n.follow = true; n.comp = true; n.tx = n.x; n.ty = n.y
+            npcs.removeAll { it.name == nm }
+            npcs.add(n)
+        }
+        if (room == Room.HOME && rmNow.stage >= 4 && rmNow.partner.isNotEmpty()) {
+            val sp = Npc(npcLookFor(rmNow.partner), 9f, 8.4f)
+            sp.name = rmNow.partner; sp.wander = true; sp.friend = true; sp.tx = sp.x; sp.ty = sp.y; sp.state = 1; sp.timer = 1f
+            npcs.add(sp)
+            rmNow.kids.forEachIndexed { i, kd ->
+                val k = Npc(npcLookFor(kd.first), 7f + i * 1.5f, 9.4f)
+                k.name = kd.first; k.wander = true; k.kid = true; k.tx = k.x; k.ty = k.y; k.state = 1; k.timer = 0.5f * i
+                k.scale = 0.5f + ((g.day - kd.second) / 60f).coerceIn(0f, 1f) * 0.35f
+                npcs.add(k)
+            }
         }
     }
 
@@ -228,20 +263,31 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
                 val pn = pendNpc
                 if (pn != null) {
                     val dd = sqrt((pn.x - me.x) * (pn.x - me.x) + (pn.y - me.y) * (pn.y - me.y))
-                    if (dd < 1.7f) { target = null; pendNpc = null; if (pn.name == "Vendedor") storePanel = true else chatNpc = pn; pn.face = if (me.x < pn.x) -1 else 1 }
+                    if (dd < 1.7f) { target = null; pendNpc = null; if (pn.name == "Vendedor") storePanel = true else if (pn.kid) { pn.line = if (myLook.female) "Mamãe!" else "Papai!"; pn.state = 1; pn.timer = 3f } else chatNpc = pn; pn.face = if (me.x < pn.x) -1 else 1 }
                     else target = Offset(pn.x - 1.3f * (if (me.x < pn.x) 1 else -1), pn.y)
                 }
                 if (act != 0) {
                     if (actPhase == 1 && target == null) { actPhase = 2; actT = 0f }
                     if (actPhase == 2) {
                         actT += dt
-                        if (actT > 3.2f) {
+                        if (act == 7) {
+                            val want = min(180, (actT / 7f * 180f).toInt())
+                            if (want > actSpent) { g.spendTime(want - actSpent); actSpent = want }
+                        }
+                        if (actT > (if (act == 7) 7f else 3.2f)) {
+                            if (act == 1 || act == 2 || act == 4 || act == 6 || act == 7) shared++
                             when (act) {
                                 1 -> { g.thirst = max(0.0, g.thirst - 5.0); g.spendTime(45); g.message = "Mergulho refrescante!" }
                                 2 -> { g.spendTime(30); g.message = "Hora de relaxar no sol" }
                                 3 -> { g.spendTime(20); g.message = "O vento passou. Dá pra voltar a negociar" }
                                 4 -> { g.spendTime(10); g.message = "Banho tomado, novo em folha" }
                                 5 -> { g.spendTime(60); g.thirst = max(0.0, g.thirst - 8.0); g.message = "Você dançou a noite toda!" }
+                                6 -> { g.spendTime(60); g.message = "Ficaram um tempo sentados, só curtindo." }
+                                7 -> {
+                                    if (actSpent < 180) g.spendTime(180 - actSpent)
+                                    actSpent = 0
+                                    g.message = "O tempo passou devagarinho. Agora são ${g.minutes / 60}h${(g.minutes % 60).toString().padStart(2, '0')}."
+                                }
                             }
                             act = 0; actPhase = 0
                         }
@@ -257,6 +303,27 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
                 while (it.hasNext()) {
                     val n = it.next()
                     n.walking = false
+                    if (n.follow) {
+                        val idx = companions.indexOf(n.name).coerceAtLeast(0)
+                        val side = if (idx % 2 == 0) -1f else 1f
+                        val gx = (me.x + side * (1.4f + (idx / 2) * 1.2f)).coerceIn(0.8f, 15.2f)
+                        val gy = (me.y + 0.25f * (idx + 1)).coerceIn(if (room == Room.BEACH) 4.8f else 7.0f, 11.9f)
+                        val fx = gx - n.x; val fy = gy - n.y
+                        val fd = sqrt(fx * fx + fy * fy)
+                        if (fd > 0.35f) {
+                            val st = min(fd, 6.2f * dt)
+                            n.x += fx / fd * st; n.y += fy / fd * st
+                            if (abs(fx) > 0.03f) n.face = if (fx < 0) -1 else 1
+                            n.walking = true
+                        } else n.face = if (me.x < n.x) -1 else 1
+                        n.timer -= dt
+                        if (n.timer <= 0f) {
+                            n.line = if (n.line.isEmpty() && rnd.nextInt(3) == 0) wrap(companionLine(n.name == partnerName, g.minutes, room, rnd)) else ""
+                            n.timer = 3.5f + rnd.nextFloat() * 4f
+                        }
+                        n.state = 1
+                        continue
+                    }
                     if (n.wander) {
                         if (n.state == 1) {
                             n.timer -= dt
@@ -387,14 +454,24 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
                         fun person(n: Npc) = items.add(n.y to {
                             val ph = time * (if (n.walking || n.dance) 10f else 1.5f)
                             val hopD = if (n.dance) abs(sin(time * 7.5f + n.x * 2f)) * 0.35f * u else 0f
-                            drawChar(n.look, (n.x - 6f * cu / u) * u + (if (n.dance) sin(time * 3.7f + n.x) * 0.15f * u else 0f), (n.y * u) - 24.8f * cu - hopD, cu, n.face < 0, if (n.walking || n.dance) 1f else 0f, ph)
+                            val cs = cu * n.scale
+                            drawChar(n.look, (n.x - 6f * cs / u) * u + (if (n.dance) sin(time * 3.7f + n.x) * 0.15f * u else 0f), (n.y * u) - 24.8f * cs - hopD, cs, n.face < 0, if (n.walking || n.dance) 1f else 0f, ph)
                             if (n.mechanic && n.state == 1 && sin(time * 18f) > 0f) {
                                 val sx = (n.x + 0.8f * n.face) * u; val sy = (n.y - 0.9f) * u
                                 drawRect(Color(0xFFFFF176), Offset(sx, sy), Size(u * 0.18f, u * 0.18f))
                                 drawRect(Color(0xFFFF9800), Offset(sx + u * 0.3f, sy - u * 0.2f), Size(u * 0.12f, u * 0.12f))
                             }
                         })
-                        npcs.forEach { person(it) }
+                        fun compPose(n: Npc) = items.add(n.y to {
+                            if (act == 1) {
+                                val bb = sin(time * 4f + n.x) * 0.15f
+                                drawChar(n.look, (n.x - 6f * cu / u) * u, (n.y + bb) * u - 24.8f * cu, cu, n.face < 0, 1f, time * 6f)
+                                drawRect(Color(0xAA3FA9F5), Offset((n.x - 1.3f) * u, (n.y - 1.2f + bb) * u), Size(2.6f * u, 1.5f * u))
+                            } else {
+                                drawSitter(n.look, n.x, n.y, u, n.face < 0, room == Room.BEACH)
+                            }
+                        })
+                        npcs.forEach { n -> if (n.comp && act != 0 && actPhase == 2 && (act == 1 || act == 2 || act == 6 || act == 7)) compPose(n) else person(n) }
                         if (act != 0 && actPhase == 2) {
                             val bob = sin(time * 4f) * 0.15f
                             when (act) {
@@ -413,6 +490,7 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
                                     val hp = abs(sin(time * 7.5f)) * 0.5f * u
                                     drawChar(myLook, (me.x - 6f * cu / u) * u + sin(time * 3.7f) * 0.25f * u, me.y * u - 24.8f * cu - hp, cu, sin(time * 1.9f) < 0, 1f, time * 10f)
                                 })
+                                6, 7 -> items.add(me.y to { drawSitter(myLook, me.x, me.y, u, me.face < 0, room == Room.BEACH) })
                                 3 -> items.add(me.y to {
                                     drawChar(myLook, (me.x - 6f * cu / u) * u + sin(time * 12f) * u * 0.08f, me.y * u - 24.8f * cu, cu, false, 0f, time * 3f)
                                 })
@@ -429,11 +507,12 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
                         items.sortBy { it.first }
                         items.forEach { it.second() }
                         // balões por cima de tudo
-                        if (act != 0 && actPhase == 2) tag(when (act) { 1 -> "Que água gelada!"; 2 -> "Ahh, que sol bom..."; 3 -> "Esperando o vento passar..."; 5 -> "Esse som tá demais!"; else -> "Banho quentinho!" }, me.x * u, (me.y - 2.8f) * u, u * 0.46f, Color.White, Color.Black, Color.Black)
+                        if (act != 0 && actPhase == 2) tag(when (act) { 1 -> "Que água gelada!"; 2 -> "Ahh, que sol bom..."; 3 -> "Esperando o vento passar..."; 5 -> "Esse som tá demais!"; 6 -> "Que paz... só ouvindo o ambiente."; 7 -> "Olha como o tempo voa..."; else -> "Banho quentinho!" }, me.x * u, (me.y - 2.8f) * u, u * 0.46f, Color.White, Color.Black, Color.Black)
                         npcs.filter { it.friend && it.line.isEmpty() }.forEach { n -> tag("" + n.name, n.x * u, (n.y - 2.6f) * u, u * 0.4f, Color(0xFFFFF9C4), Color.Black, Color.Black) }
                         npcs.forEach { n ->
                             if (n.state == 1 && n.line.isNotEmpty()) tag(n.line, n.x * u, (n.y - 2.7f) * u, u * 0.46f, Color.White, Color.Black, Color.Black)
                         }
+                        if (room == Room.BEACH || room == Room.PARK) drawRect(Color(0xFF050B24).copy(alpha = 0.5f * nightF(g.minutes)), Offset.Zero, size)
                         cv.restore()
                     }
                 }
@@ -454,12 +533,23 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
                     }
                 }
                 if (room == Room.BEACH) {
-                    fun go(a: Int, x: Float, y: Float) { if (act == 0) { act = a; actPhase = 1; target = Offset(x, y); pending = -1; pendNpc = null } }
+                    fun go(a: Int, x: Float, y: Float) { if (act == 0) { act = a; actPhase = 1; target = Offset(x, y); pending = -1; pendNpc = null; actSpent = 0 } }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedButton(onClick = { go(1, 8f, 5.1f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Mergulho", fontSize = 11.sp) }
+                        OutlinedButton(onClick = { go(1, 8f, 5.1f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Nadar", fontSize = 11.sp) }
                         OutlinedButton(onClick = { go(2, 4.5f, 9f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Sol", fontSize = 11.sp) }
                         OutlinedButton(onClick = { go(3, 8f, 8f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Vento", fontSize = 11.sp) }
                         OutlinedButton(onClick = { go(4, 10.4f, 7.6f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Banho", fontSize = 11.sp) }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(onClick = { go(6, 7f, 8.6f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Sentar na areia", fontSize = 11.sp) }
+                        OutlinedButton(onClick = { go(7, 7f, 8.6f) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Ver o tempo passar", fontSize = 11.sp) }
+                    }
+                }
+                if (room == Room.PARK) {
+                    fun goP(a: Int) { if (act == 0) { act = a; actPhase = 1; target = Offset(3f, 7.0f); pending = -1; pendNpc = null; actSpent = 0 } }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(onClick = { goP(6) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Sentar no banco", fontSize = 11.sp) }
+                        OutlinedButton(onClick = { goP(7) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Ver o tempo passar", fontSize = 11.sp) }
                     }
                 }
                 if (room == Room.HOME && friends.any { it.value >= FRIEND_LVL }) OutlinedButton(onClick = { callDlg = true }, Modifier.fillMaxWidth()) { Text("Chamar um amigo pra vir aqui") }
@@ -499,7 +589,7 @@ fun InteriorDialog(g: GameState, room: Room, onSleep: () -> Unit = {}, storeIdx:
                 friends.filter { it.value >= FRIEND_LVL }.keys.forEach { nm ->
                     OutlinedButton(onClick = {
                         if (npcs.none { it.name == nm }) {
-                            val n = Npc(randomLook(Random(nm.hashCode())), DOOR_X, 11.8f)
+                            val n = Npc(npcLookFor(nm), DOOR_X, 11.8f)
                             n.name = nm; n.wander = true; n.friend = true; n.tx = 6f; n.ty = 8.5f; n.state = 0; npcs.add(n)
                         }
                         g.message = "$nm tá chegando!"; callDlg = false
@@ -587,8 +677,18 @@ private fun DrawScope.drawRoom(g: GameState, room: Room, u: Float, t: Float, nCa
             tag("PIPOCA", 13.7f * u, 4.2f * u, u * 0.4f, Color.White, Color.Black, Color.Black)
         }
         Room.BEACH -> {
-            r(0xFF9AD7FF, 0f, 0f, GW, 1.2f)
-            r(0xFF1E88E5, 0f, 1.2f, GW, 3f)
+            val nf = nightF(g.minutes)
+            val warm = 4f * nf * (1f - nf)
+            val skyC = lerp(lerp(Color(0xFF9AD7FF), Color(0xFF14204A), nf), Color(0xFFFF9A6B), warm * 0.6f)
+            val seaC = lerp(lerp(Color(0xFF1E88E5), Color(0xFF0D2B5C), nf), Color(0xFFD1704A), warm * 0.3f)
+            drawRect(skyC, Offset(0f, 0f), Size(GW * u + 1f, 1.2f * u + 1f))
+            drawRect(seaC, Offset(0f, 1.2f * u), Size(GW * u + 1f, 3f * u + 1f))
+            if (g.minutes in (6 * 60) until (19 * 60)) {
+                drawCircle(Color(0xFFFFF176), 0.5f * u, Offset((2f + (g.minutes - 360) / 780f * 12f) * u, 0.65f * u))
+            } else {
+                val mt = ((g.minutes - 19 * 60 + 1440) % 1440) / 660f
+                drawCircle(Color(0xFFF5F5F5), 0.4f * u, Offset((2f + mt.coerceIn(0f, 1f) * 12f) * u, 0.65f * u))
+            }
             for (k in 0 until 7) r(0xFFBBDEFB, ((k * 2.6f + t * 1.4f) % 17f) - 1f, 1.7f + (k % 3) * 0.9f, 1.4f, 0.12f)
             r(0xFFFFFFFF, 0f, 4.1f + sin(t * 1.5f) * 0.1f, GW, 0.25f)
             r(0xFFF2D49B, 0f, 4.4f, GW, 7.6f)

@@ -34,23 +34,14 @@ import kotlin.random.Random
 
 class BuyerLook(val female: Boolean, val skin: Color, val hair: Color, val shirt: Color, val pants: Color)
 
-// boneco 16x28: cada linha tem só a metade esquerda (8 colunas); o espelho é montado na hora
-// k contorno, h cabelo, H cabelo escuro, s pele, S pele escura, e olho, w branco do olho, m boca,
-// c camisa, C camisa escura, p calça/saia, P calça escura, o sapato
 private val MAN = listOf(
-    "....kkkk", "...khhhh", "..khhhhh", "..khhhhh", "..khhhhh", "..khhsss", "..kssHss", "..kswess",
-    "..kssssS", "..kssssm", "...kssss", "....kSSS",
-    "..kccccc", ".kccCccc", ".kccCccc", ".ksSCccc", ".ksSCccc", ".kssCccc", "..kkCccc", "...kkkkk",
-    "...kpppp", "...kpppp", "...kpppk", "...kpppk", "...kpppk", "...kpppk", "..kooook", "..kkkkkk",
+    "..hhhh..", ".hhhhhh.", ".hssssh.", ".sesses.", ".ssssss.", "..ssss..", ".cccccc.",
+    "sccccccs", "sccccccs", "sccccccs", ".pppppp.", ".pp..pp.", ".pp..pp.", ".oo..oo.",
 )
 private val WOMAN = listOf(
-    "....kkkk", "...khhhh", "..khhhhh", "..khhhhh", ".khhhhhh", ".khhhsss", ".khhsHss", ".khhwess",
-    ".khhsssS", ".khhsssm", "..khssss", "..khkSSS",
-    ".khhcccc", ".khhCccc", ".kccCccc", ".ksSCccc", ".ksSCccc", ".kssCccc", "..kkCccc", "...kkkkk",
-    "..kppppp", ".kpppppp", ".kppPppp", "...kssSk", "...ksssk", "...ksssk", "..kooook", "..kkkkkk",
+    "..hhhh..", ".hhhhhh.", "hhsssshh", "hsessesh", "hssssssh", "h.ssss.h", "hcccccch",
+    "sccccccs", ".cccccc.", "..cccc..", ".pppppp.", ".pppppp.", ".ss..ss.", ".oo..oo.",
 )
-
-private fun shade(c: Color, f: Float) = Color(c.red * f, c.green * f, c.blue * f, 1f)
 
 private val SKINS = listOf(0xFFFFDBB4, 0xFFE8B98A, 0xFFC68642, 0xFF8D5524, 0xFF5C3A1E).map { Color(it) }
 private val HAIRS = listOf(0xFF1B1B1B, 0xFF4E342E, 0xFF8D6E63, 0xFFE0B04F, 0xFFB71C1C, 0xFF9E9E9E).map { Color(it) }
@@ -62,27 +53,18 @@ private val F_NAMES = listOf("Mariana", "Fernanda", "Dona Cida", "Juliana", "Pat
 @Composable
 fun PixelPerson(look: BuyerLook, modifier: Modifier) {
     Canvas(modifier) {
-        val half = if (look.female) WOMAN else MAN
-        val cw = size.width / 16f
-        val ch = size.height / half.size
-        val outline = Color(0xFF1E181C)
-        half.forEachIndexed { y, hrow ->
-            val row = hrow + hrow.reversed()
+        val rows = if (look.female) WOMAN else MAN
+        val cw = size.width / 8f
+        val ch = size.height / rows.size
+        rows.forEachIndexed { y, row ->
             row.forEachIndexed { x, c ->
                 val col = when (c) {
-                    'k' -> outline
                     'h' -> look.hair
-                    'H' -> shade(look.hair, 0.7f)
                     's' -> look.skin
-                    'S' -> shade(look.skin, 0.82f)
-                    'e' -> Color(0xFF1E181C)
-                    'w' -> Color.White
-                    'm' -> Color(0xFFB04A4A)
+                    'e' -> Color(0xFF212121)
                     'c' -> look.shirt
-                    'C' -> shade(look.shirt, 0.75f)
                     'p' -> look.pants
-                    'P' -> shade(look.pants, 0.75f)
-                    'o' -> Color(0xFF5A3C2D)
+                    'o' -> Color(0xFF3E2723)
                     else -> null
                 }
                 if (col != null) drawRect(col, Offset(x * cw, y * ch), Size(cw + 0.5f, ch + 0.5f))

@@ -1,6 +1,18 @@
 package com.ferrovelho.game
 
-enum class Body { BOXY, COMPACT, WAGON, MPV, HATCH, SEDAN, SUV, PICKUP, COUPE, CLASSIC, VAN, BEETLE, SUPER, RETRO, BOXSEDAN, CREW, JEEP }
+/**
+ * Carroceria (silhueta). Os valores P_* usam o sprite próprio de um veículo dos packs (brasileiros + luxo):
+ * pk = índice do sprite (ver PackData.kt). Para os demais, pk = -1 e vale a carroceria genérica (vehicleFor).
+ */
+enum class Body(val pk: Int = -1) {
+    BOXY, COMPACT, WAGON, MPV, HATCH, SEDAN, SUV, PICKUP, COUPE, CLASSIC, VAN, BEETLE, SUPER,
+    UNO, GOL, NOTCH, OPALA, MUSCLE, P911, JEEP, MINI,
+    // ---- sprites dos packs (gerado: tools/gen/build_packs.sh -> packs_out/body_enum.txt)
+    P_FUSCA(27), P_KOMBI(28), P_UNO(29), P_GOL_Q(30), P_GOL_G4(31), P_CORSA(32), P_PALIO(33), P_STRADA(34), P_SIENA(35), P_CIVIC(36), P_COROLLA(37), P_ETIOS(38), P_OPALA(39), P_CHEVETTE(40), P_MAVERICK(41), P_DELREY(42), P_VOYAGE(43), P_SANTANA(44), P_MONZA(45), P_OMEGA(46), P_KADETT(47), P_LOGUS(48), P_TEMPRA(49), P_P206(50), P_HB20(51), P_SANDERO(52), P_DUSTER(53), P_ECOSPORT(54), P_TRACKER(55), P_CRETA(56), P_COMPASS(57), P_RENEGADE(58), P_F1000(59), P_C10(60), P_D20(61), P_RANGER(62), P_S10(63), P_AMAROK(64), P_HILUX(65), P_MB1113(66), P_ONIBUS(67), P_ESCOLAR(68), P_MOTO_CG(69), P_MOTO_TITAN(70), P_MOTO_FAN(71), P_MOTO_BIZ(72), P_MOTO_ENTREGA(73), P_VAN(74), P_L_PORSCHE(75), P_L_FERRARI(76), P_L_LAMBO(77), P_L_BUGATTI(78), P_L_MCLAREN(79), P_L_ROLLS(80), P_L_BMW(81), P_L_MERCEDES(82), P_L_AUDI(83), P_L_LEXUS(84), P_L_MASERATI(85), P_L_BENTLEY(86), P_L_JAGUAR(87), P_L_TESLA(88), P_L_RANGEROVER(89), P_L_CADILLAC(90), P_L_CORVETTE(91), P_L_VIPER(92), P_L_MCLAREN_F1(93), P_L_KOENIGSEGG(94), P_L_PAGANI(95), P_L_ASTON(96), P_L_SENNA(97), P_L_REVUELTO(98);
+
+    /** tipo de veículo do pack ("hatch", "sedan", "pickup", "suv", "super", "bus"...) ou "" se não for do pack */
+    val packKind: String get() = if (pk >= P_BASE) PACK_KIND[pk - P_BASE] else ""
+}
 
 enum class Cat(val label: String) {
     POPULAR("Popular"),
@@ -38,23 +50,74 @@ private val PI = Cat.PICAPE
 private val ES = Cat.ESPORTIVO
 private val CL = Cat.CLASSICO
 
+/** Modelos que têm sprite PRÓPRIO nos packs (brasileiros + luxo). Os demais usam a silhueta genérica de SHAPE. */
+private val PACK_SHAPE: Map<String, Body> = mapOf(
+    "Uno" to Body.P_UNO,
+    "Gol" to Body.P_GOL_G4,
+    "Corsa" to Body.P_CORSA,
+    "Palio" to Body.P_PALIO,
+    "Strada" to Body.P_STRADA,
+    "Siena" to Body.P_SIENA,
+    "Civic" to Body.P_CIVIC,
+    "Corolla" to Body.P_COROLLA,
+    "Etios" to Body.P_ETIOS,
+    "Opala" to Body.P_OPALA,
+    "Chevette" to Body.P_CHEVETTE,
+    "Maverick GT" to Body.P_MAVERICK,
+    "Del Rey" to Body.P_DELREY,
+    "Voyage" to Body.P_VOYAGE,
+    "Santana" to Body.P_SANTANA,
+    "Monza" to Body.P_MONZA,
+    "Omega" to Body.P_OMEGA,
+    "Kadett GSi" to Body.P_KADETT,
+    "Tempra" to Body.P_TEMPRA,
+    "206" to Body.P_P206,
+    "HB20" to Body.P_HB20,
+    "Sandero" to Body.P_SANDERO,
+    "Duster" to Body.P_DUSTER,
+    "EcoSport" to Body.P_ECOSPORT,
+    "Tracker" to Body.P_TRACKER,
+    "Creta" to Body.P_CRETA,
+    "Compass" to Body.P_COMPASS,
+    "Renegade" to Body.P_RENEGADE,
+    "F-1000" to Body.P_F1000,
+    "Ranger" to Body.P_RANGER,
+    "S10" to Body.P_S10,
+    "Amarok" to Body.P_AMAROK,
+    "Hilux" to Body.P_HILUX,
+    "Fusca" to Body.P_FUSCA,
+    "Kombi" to Body.P_KOMBI,
+    "911 Carrera" to Body.P_L_PORSCHE,
+    "488 GTB" to Body.P_L_FERRARI,
+    "Huracán" to Body.P_L_LAMBO,
+    "M3" to Body.P_L_BMW,
+    "AMG GT" to Body.P_L_MERCEDES,
+    "R8" to Body.P_L_AUDI,
+    "Corvette" to Body.P_L_CORVETTE,
+)
+
 /** Silhueta própria por modelo (o que não estiver aqui usa a carroceria genérica da linha). */
 private val SHAPE: Map<String, Body> = buildMap {
-    listOf("Uno", "147", "Gol", "Brasília", "Kadett GSi", "Escort XR3", "Soul", "Kwid", "BR-800", "Fiorino")
+
+    listOf("Uno", "147").forEach { put(it, Body.UNO) }
+    listOf("Gol", "Gol GTI").forEach { put(it, Body.GOL) }
+    listOf("Jetta", "Santana", "Passat", "Voyage").forEach { put(it, Body.NOTCH) }
+    listOf("Opala", "Corcel").forEach { put(it, Body.OPALA) }
+    listOf("Camaro SS", "Mustang GT", "Maverick GT", "Challenger", "Charger").forEach { put(it, Body.MUSCLE) }
+    listOf("911 Carrera", "718 Cayman").forEach { put(it, Body.P911) }
+    listOf("Wrangler", "Jeep CJ", "T4", "Defender", "Marruá", "Xavante", "Bandeirante").forEach { put(it, Body.JEEP) }
+    listOf("Cooper S", "John Cooper Works", "Abarth 500").forEach { put(it, Body.MINI) }
+    listOf("Brasília", "Kadett GSi", "Escort XR3", "Soul", "Kwid", "BR-800", "Fiorino")
         .forEach { put(it, Body.BOXY) }
     listOf("Palio", "Mobi", "Argo", "Punto", "Celta", "Corsa", "Onix", "Agile", "Ka", "Fiesta", "Up!", "Fox",
         "Polo", "HB20", "March", "206", "207", "208", "Etios", "Sandero", "Yaris", "Twingo", "Clio", "Dolphin")
         .forEach { put(it, Body.COMPACT) }
-    listOf("Opala", "Corcel", "Del Rey", "Chevette").forEach { put(it, Body.RETRO) }
-    listOf("Santana", "Passat", "Monza", "Tempra", "Omega", "Voyage").forEach { put(it, Body.BOXSEDAN) }
-    listOf("Hilux", "S10", "Ranger", "Amarok", "Frontier", "L200 Triton", "Toro", "2500", "F-1000", "Oroch").forEach { put(it, Body.CREW) }
-    listOf("Jeep CJ", "Bandeirante", "T4", "Marruá", "Xavante", "Wrangler", "Defender").forEach { put(it, Body.JEEP) }
     listOf("Parati", "Belina").forEach { put(it, Body.WAGON) }
     listOf("Idea", "Doblò", "Meriva", "Spin", "Fit").forEach { put(it, Body.MPV) }
 }
 
 private fun m(brand: String, name: String, base: Int, body: Body, cat: Cat, from: Int, to: Int) =
-    CarModel(brand, name, base, SHAPE[name] ?: body, cat, from, to)
+    CarModel(brand, name, base, PACK_SHAPE[name] ?: (if (body.pk >= 0) body else SHAPE[name] ?: body), cat, from, to)
 
 // Valores e anos aproximados, só pra jogabilidade. Pra adicionar um carro, é só incluir uma linha aqui.
 val CATALOG: List<CarModel> = listOf(
@@ -284,4 +347,59 @@ val CATALOG: List<CarModel> = listOf(
     m("Volvo", "XC90", 300000, U, SU, 2003, 2026),
     m("Ferrari", "488 GTB", 2000000, Body.SUPER, ES, 2015, 2019),
     m("Lamborghini", "Huracán", 2500000, Body.SUPER, ES, 2014, 2026),
+
+    // ---------- Pack de veículos brasileiros (modelos novos, sempre no FIM da lista pra não bagunçar jogos salvos) ----------
+    m("Volkswagen", "Gol Quadrado", 22000, Body.P_GOL_Q, CL, 1980, 1994),
+    m("Volkswagen", "Logus", 9000, Body.P_LOGUS, PO, 1993, 1996),
+    m("Chevrolet", "C10", 70000, Body.P_C10, CL, 1964, 1985),
+    m("Chevrolet", "D-20", 45000, Body.P_D20, PI, 1985, 1996),
+    m("Renault", "Master", 180000, Body.P_VAN, PO, 2004, 2026),
+
+    // ---------- Pack de carros de luxo ----------
+    m("Bugatti", "Chiron", 8000000, Body.P_L_BUGATTI, ES, 2017, 2024),
+    m("McLaren", "720S", 1800000, Body.P_L_MCLAREN, ES, 2018, 2025),
+    m("Rolls-Royce", "Ghost", 2200000, Body.P_L_ROLLS, SE, 2010, 2025),
+    m("Lexus", "RC F", 450000, Body.P_L_LEXUS, ES, 2015, 2025),
+    m("Maserati", "Ghibli", 600000, Body.P_L_MASERATI, SE, 2014, 2025),
+    m("Bentley", "Flying Spur", 1800000, Body.P_L_BENTLEY, SE, 2006, 2025),
+    m("Jaguar", "XF", 350000, Body.P_L_JAGUAR, SE, 2009, 2025),
+    m("Tesla", "Model S", 500000, Body.P_L_TESLA, SE, 2016, 2024),
+    m("Land Rover", "Range Rover Vogue", 900000, Body.P_L_RANGEROVER, SU, 2012, 2026),
+    m("Cadillac", "CTS-V", 450000, Body.P_L_CADILLAC, ES, 2009, 2019),
+    m("Dodge", "Viper", 700000, Body.P_L_VIPER, ES, 1992, 2017),
+    m("McLaren", "F1", 15000000, Body.P_L_MCLAREN_F1, CL, 1993, 1998),
+    m("Koenigsegg", "Agera RS", 12000000, Body.P_L_KOENIGSEGG, ES, 2015, 2018),
+    m("Pagani", "Huayra", 14000000, Body.P_L_PAGANI, ES, 2012, 2020),
+    m("Aston Martin", "Vantage", 1200000, Body.P_L_ASTON, ES, 2018, 2025),
+    m("McLaren", "Senna", 6000000, Body.P_L_SENNA, ES, 2018, 2019),
+    m("Lamborghini", "Revuelto", 4500000, Body.P_L_REVUELTO, ES, 2024, 2026),
 )
+
+/**
+ * Quais peças de tuning cabem em cada carro. Retorna o motivo de NÃO caber (null = cabe).
+ * Pra mudar uma regra, é só mexer nas listas abaixo.
+ */
+fun tuneBlock(m: CarModel, t: Tuning): String? {
+    val b = m.body
+    val ev = m.name == "Dolphin" || m.name == "Seal" || m.name == "Model S"
+    // sprites dos packs: TODA peça tem versão visual pra eles (rodas, aerofólio, neon, suspensão...). Só o carro elétrico
+    // não aceita turbo/escape.
+    if (b.packKind.isNotEmpty()) return when (t.id) {
+        "turbo" -> if (ev) "Carro elétrico, sem motor a combustão" else null
+        "escape" -> if (ev) "Carro elétrico, sem escapamento" else null
+        else -> null
+    }
+    return when (t.id) {
+        "aerofolio" -> if (b in listOf(Body.PICKUP, Body.VAN, Body.JEEP, Body.SUV, Body.MPV, Body.BEETLE, Body.SUPER, Body.P911))
+            "Não cabe nesse carro" else null
+        "parachoque" -> if (b in listOf(Body.VAN, Body.JEEP, Body.BEETLE, Body.CLASSIC, Body.OPALA, Body.SUPER))
+            "Não existe kit pra ele" else null
+        "turbo" -> if (ev) "Carro elétrico, sem motor a combustão"
+            else if (b in listOf(Body.VAN, Body.SUPER)) "Não serve nesse motor" else null
+        "escape" -> if (ev) "Carro elétrico, sem escapamento" else null
+        "rebaixada" -> if (b in listOf(Body.PICKUP, Body.JEEP, Body.SUV, Body.SUPER, Body.P911))
+            "Não rebaixa esse carro" else null
+        "pelicula" -> if (b == Body.JEEP) "Sem vidros fechados" else null
+        else -> null
+    }
+}
