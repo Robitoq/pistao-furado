@@ -51,3 +51,11 @@ Os três posters (`tools/gen/packs_src/`) viraram sprites individuais e estão i
   volantes, som, extras, emblemas, efeitos...) estão em `tools/gen/packs_out/tun/`; os veículos em alta resolução, em `packs_out/cut/`.
 - Para regenerar tudo: `sh tools/gen/build_packs.sh` (precisa de python3 + numpy, scipy, opencv-python, pillow).
   Teste de consistência: `python3 tools/gen/packs_selftest.py`. Pré-visualização: `tools/gen/packs_preview.py`.
+
+
+## Transporte público (atualização)
+
+- Pontos de ônibus em diferentes bairros da cidade, com identificação de linha.
+- Menu interativo no ponto, com destinos como casa, oficina, banco, centro, parque, praia e bairro novo.
+- Passagem de R$ 5,00, viagem de 15 minutos e funcionamento das 5h às 23h.
+- O embarque atualiza o horário, o dinheiro e a posição salva do personagem.
